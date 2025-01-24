@@ -63,6 +63,86 @@ Robo-tricks: AI-Powered Robot Design & Management
 
 ---
 
+# Market Segmentation
+
+```mermaid
+pie
+    title Target Market Distribution (Year 1)
+    "SMB Manufacturing" : 45
+    "Warehousing & Logistics" : 35
+    "Research Institutions" : 12
+    "Other Industries" : 8
+```
+
+---
+
+# Revenue Growth Projection
+
+```mermaid
+graph LR
+    style Q4_2024 fill:#e6f3ff
+    style Q4_2025 fill:#b3d9ff
+    style Q4_2026 fill:#80bfff
+    Q4_2024[Q4 2024<br/>$2M] --> Q4_2025[Q4 2025<br/>$15M]
+    Q4_2025 --> Q4_2026[Q4 2026<br/>$50M]
+```
+
+---
+
+# Go-to-Market Strategy
+
+```mermaid
+graph TD
+    A[Market Entry] --> B[Phase 1: Direct Sales]
+    A --> C[Phase 2: Channel Partners]
+    B --> D[SMB Manufacturing]
+    B --> E[Warehousing]
+    C --> F[System Integrators]
+    C --> G[Industry Consultants]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#bbf,stroke:#333
+```
+
+---
+
+# Component Strategy
+
+```mermaid
+graph TB
+    A[Parts Library] --> B[Standard Tier]
+    A --> C[Pro Tier]
+    B --> D[Basic Components]
+    B --> E[Common Parts]
+    C --> F[Patented Designs]
+    C --> G[Premium Parts]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#fbb,stroke:#333
+```
+
+---
+
+# Customer Journey
+
+```mermaid
+journey
+    title Robo-tricks Implementation Process
+    section Discovery
+      Initial Contact: 5: Customer
+      Requirements Gathering: 3: Customer, Sales
+      Solution Design: 4: AI System
+    section Implementation
+      Component Selection: 5: Customer, AI
+      Assembly: 4: Robo-tricks
+      Deployment: 3: Support
+    section Ongoing
+      Maintenance: 4: Support
+      Upgrades: 5: Support, AI
+```
+
+---
+
 # Competitive Advantage
 
 ## Traditional Robotics

@@ -2,6 +2,15 @@
 
 ## Target Market Segmentation
 
+```mermaid
+pie
+    title "Year 1 Revenue Distribution Target"
+    "SMB Manufacturing (45%)" : 45
+    "Warehousing & Logistics (35%)" : 35
+    "Research Institutions (12%)" : 12
+    "Other Industries (8%)" : 8
+```
+
 ### Primary Markets (Year 1)
 1. Small-to-Medium Manufacturing
    - Annual revenue: $5M-$50M
@@ -14,6 +23,23 @@
    - Distribution centers
    - 3PL providers
    - Small-scale warehouses
+
+```mermaid
+graph TB
+    A[Market Evolution] --> B[Year 1: Primary Markets]
+    A --> C[Year 2+: Secondary Markets]
+    B --> D[SMB Manufacturing]
+    B --> E[Warehousing & Logistics]
+    C --> F[Research Institutions]
+    C --> G[Specialized Industries]
+    D --> H[Revenue: $5M-$50M]
+    E --> I[E-commerce/Distribution]
+    F --> J[Universities/R&D]
+    G --> K[Food/Agriculture/Medical]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#fbb,stroke:#333
+```
 
 ### Secondary Markets (Year 2+)
 1. Research Institutions
@@ -28,6 +54,20 @@
    - Clean rooms
 
 ## Customer Acquisition Strategy
+
+```mermaid
+graph LR
+    A[GTM Phases] --> B[Phase 1: Market Entry]
+    A --> C[Phase 2: Market Expansion]
+    B --> D[Direct Sales]
+    B --> E[Digital Marketing]
+    B --> F[Industry Partnerships]
+    C --> G[Channel Partners]
+    C --> H[Geographic Expansion]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#fbb,stroke:#333
+```
 
 ### Phase 1: Market Entry
 1. Direct Sales
@@ -61,6 +101,24 @@
 
 ## Sales Process
 
+```mermaid
+graph TD
+    A[Sales Process Flow] --> B[Lead Generation]
+    B --> C[Initial Consultation]
+    C --> D[Solution Design]
+    D --> E[Pilot Program]
+    E --> F[Full Implementation]
+    B --> G[Inbound Marketing]
+    B --> H[Outbound Activities]
+    G --> I[Technical Content]
+    G --> J[ROI Calculators]
+    H --> K[Trade Shows]
+    H --> L[Direct Outreach]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style E fill:#fbb,stroke:#333
+```
+
 ### Lead Generation
 1. Inbound Marketing
    - Technical content
@@ -74,28 +132,26 @@
    - Direct outreach
    - Partner referrals
 
-### Sales Cycle
-1. Initial Consultation
-   - Use case assessment
-   - Requirements gathering
-   - Site evaluation
-
-2. Solution Design
-   - AI-generated robot design
-   - Custom configuration
-   - Pricing proposal
-
-3. Pilot Program
-   - Small-scale deployment
-   - Success metrics
-   - ROI validation
-
-4. Full Implementation
-   - Deployment schedule
-   - Training plan
-   - Support structure
-
 ## Pricing Strategy
+
+```mermaid
+graph TB
+    A[Revenue Streams] --> B[Subscription Tiers]
+    A --> C[Additional Services]
+    B --> D[Basic]
+    B --> E[Professional]
+    B --> F[Enterprise]
+    C --> G[Component Upgrades]
+    C --> H[Training]
+    C --> I[Integration]
+    C --> J[Consulting]
+    D --> K[Standard Parts]
+    E --> L[Pro Parts Limited]
+    F --> M[Full Pro Access]
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#fbb,stroke:#333
+```
 
 ### Component Tiers
 1. Standard Parts Library
@@ -230,17 +286,20 @@
 
 ## Implementation Timeline
 
-### Q1-Q2 2024
-- [ ] Build sales team
-- [ ] Develop marketing materials
-- [ ] Launch website
-- [ ] Initial customer pilots
-
-### Q3-Q4 2024
-- [ ] Expand partner network
-- [ ] Scale marketing efforts
-- [ ] Launch customer success program
-- [ ] Begin regional expansion
+```mermaid
+gantt
+    title 2024 Implementation Plan
+    dateFormat  YYYY-MM-DD
+    section Q1-Q2
+    Build sales team           :2024-01-01, 90d
+    Develop marketing         :2024-02-01, 60d
+    Launch website           :2024-03-15, 30d
+    section Q3-Q4
+    Partner network          :2024-07-01, 90d
+    Scale marketing          :2024-07-15, 90d
+    Customer success         :2024-08-01, 60d
+    Regional expansion       :2024-09-01, 90d
+```
 
 ## Risk Mitigation
 
