@@ -226,13 +226,13 @@ journey
 # Team
 
 ## Leadership
-- [Founder & CEO] - Robotics & AI expertise
-- [CTO] - Machine Learning specialist
-- [COO] - Manufacturing operations
+- Taylor Mohney - Robotics & AI expertise
+- Dorian Hryniewicki - Machine Learning specialist
+- Chris Haskins - Manufacturing operations
 
 ## Advisors
-- [Industry Expert] - Former robotics executive
-- [Technical Advisor] - AI/ML researcher
+- Dr. John Hawthorne - Former robotics executive
+- Chase Hoskins - AI/ML researcher
 
 ![width:800px](assets/team-structure.png)
 
