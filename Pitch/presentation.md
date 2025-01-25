@@ -2,6 +2,7 @@
 marp: true
 theme: default
 paginate: true
+mermaid: true
 header: "Robo-tricks"
 footer: "Confidential - 2024"
 style: |
@@ -39,14 +40,16 @@ Robo-tricks: AI-Powered Robot Design & Management
 
 ---
 
-# How It Works
+# Competitive Landscape
 
-1. **Describe Your Need** → AI generates optimal design
-2. **Select Components** → Standard or Pro parts library
-3. **We Build & Deploy** → Fully tested and ready
-4. **Ongoing Support** → Maintenance and upgrades
-
-![width:600px](assets/process-flow.png)
+| Feature                   | Traditional Integrators | Robo-tricks | Startup Competitors |
+|---------------------------|-------------------------|-------------|----------------------|
+| Deployment Time           | 6-9 months              | 3 weeks    | 2-4 months        
+| Upfront Cost              | $250k+                  | $0         | $50k+             
+| Customization             | High                    | High       | Limited           
+| Maintenance Included      | ❌                      | ✅          | ❌                
+| AI-Driven Design          | ❌                      | ✅          | Partial          
+| Component Standardization | ❌                      | ✅          | ❌                
 
 ---
 
@@ -60,6 +63,17 @@ Robo-tricks: AI-Powered Robot Design & Management
 - SMB Manufacturing ($5M-$50M revenue)
 - Warehousing & Logistics
 - Estimated Initial Market: $10B
+
+---
+
+# How It Works
+
+1. **Describe Your Need** → AI generates optimal design
+2. **Select Components** → Standard or Pro parts library
+3. **We Build & Deploy** → Fully tested and ready
+4. **Ongoing Support** → Maintenance and upgrades
+
+![width:600px](assets/process-flow.png)
 
 ---
 
@@ -108,18 +122,7 @@ graph TD
 
 # Component Strategy
 
-```mermaid
-graph TB
-    A[Parts Library] --> B[Standard Tier]
-    A --> C[Pro Tier]
-    B --> D[Basic Components]
-    B --> E[Common Parts]
-    C --> F[Patented Designs]
-    C --> G[Premium Parts]
-    style A fill:#f9f,stroke:#333
-    style B fill:#bbf,stroke:#333
-    style C fill:#fbb,stroke:#333
-```
+![Component Strategy](assets/component-strategy.svg)
 
 ---
 
@@ -230,6 +233,41 @@ journey
 ## Advisors
 - [Industry Expert] - Former robotics executive
 - [Technical Advisor] - AI/ML researcher
+
+![width:800px](assets/team-structure.png)
+
+```mermaid
+graph LR
+    A[Taylor] --> B[AI Architecture]
+    A --> C[DoD Relationships]
+    D[Dorian] --> E[ML Optimization]
+    D --> F[UX Design]
+    G[Advisors] --> H[Manufacturing]
+    G --> I[Robotics]
+```
+
+---
+
+# Technical Roadmap
+
+```mermaid
+gantt
+    title Robo-tricks Development Timeline
+    dateFormat  YYYY-MM
+    section Core Tech
+    RAG Model v1.0       :done,    des1, 2025-01, 2025-03
+    Component Library    :active,  des2, 2025-04, 2025-07
+    Control System v1    :         des3, 2025-08, 2025-10
+    
+    section Commercialization
+    Pilot Program        :         des4, 2025-06, 2025-09
+    ISO Certification   :         des5, 2025-11, 2026-02
+    Scale Production     :         des6, 2026-03, 2026-06
+    
+    section Milestones
+    Seed Round           :milestone, 2025-04, 0d
+    First Revenue        :milestone, 2025-08, 0d
+```
 
 ---
 
