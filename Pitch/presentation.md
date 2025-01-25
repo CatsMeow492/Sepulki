@@ -130,11 +130,7 @@ graph TD
 
 ```mermaid
 journey
-    title Product Confidence Levels Throughout Implementation
-    section Legend
-      Very High Confidence (5): 5: Legend
-      High Confidence (4): 4: Legend
-      Medium Confidence (3): 3: Legend
+    title Robo-tricks Implementation Process
     section Discovery
       Initial Contact: 5: Customer
       Requirements Gathering: 3: Customer, Sales
