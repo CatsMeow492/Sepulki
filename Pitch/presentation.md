@@ -130,18 +130,22 @@ graph TD
 
 ```mermaid
 journey
-    title Robo-tricks Implementation Process
+    title Robo-tricks Implementation Process & Confidence Levels
+    section Legend
+      High Confidence (5): 5: Legend
+      Moderate Confidence (3-4): 4: Legend
+      Low Confidence (1-2): 2: Legend
     section Discovery
-      Initial Contact: 5: Customer
-      Requirements Gathering: 3: Customer, Sales
-      Solution Design: 4: AI System
+      Initial Contact: 2: Customer
+      Requirements Gathering: 2: Customer, Sales
+      Solution Design: 5: AI System
     section Implementation
       Component Selection: 5: Customer, AI
-      Assembly: 4: Robo-tricks
-      Deployment: 3: Support
+      Assembly: 3: Robo-tricks
+      Deployment: 4: Support
     section Ongoing
-      Maintenance: 4: Support
-      Upgrades: 5: Support, AI
+      Maintenance: 3: Support
+      Upgrades: 3: Support, AI
 ```
 
 ---
