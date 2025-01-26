@@ -69,7 +69,7 @@ Art|Fix: AI-Powered Robot Design & Management
 # How It Works
 
 1. **Describe Your Need** → AI generates optimal design
-2. **Select Components** → Standard or Pro parts library
+2. **Select Components** → Standard or Professional parts library
 3. **We Build & Deploy** → Fully tested and ready
 4. **Ongoing Support** → Maintenance and upgrades
 
@@ -107,32 +107,36 @@ graph LR
 
 # Component Strategy - Table
 
-| Standard Tier         | Pro Tier             |
-|-----------------------|----------------------|
-| Basic Components      | Patented Designs     |
-| Common Parts          | Premium Parts        |
-| Open-Source Software  | Custom Firmware      |
-| Basic Support         | Priority Support     |
-|                       | Advanced Analytics   |
+| Basic Tier         | Professional Tier     | Enterprise Tier       |
+|-----------------------|-----------------------|-----------------------|
+| Basic Components      | Patented Designs      | Full Patent Access    |
+| Common Parts          | Premium Parts         | Custom Parts          |
+| Open-Source Software  | Custom Firmware       | Enterprise Firmware   |
+| Basic Support         | Priority Support      | 24/7 Dedicated Support|
+|                       | Advanced Analytics    | Predictive Maintenance|
 
 # Component Strategy - Diagram
 
 ```mermaid
 graph TB
     A[Parts Library] --> B[Standard Tier]
-    A --> C[Pro Tier]
-    B --> D[Basic Components]
-    B --> E[Common Parts]
-    B --> F[Open-Source Software]
-    C --> G[Patented Parts]
-    C --> H[Premium Components]
-    C --> I[Professional Evaluations]
-    C --> J[Custom Firmware]
-    C --> K[Priority Support]
+    A --> C[Professional Tier]
+    A --> D[Enterprise Tier]
+    B --> E[Basic Components]
+    B --> F[Common Parts]
+    B --> G[Open-Source Software]
+    C --> H[Patented Parts]
+    C --> I[Premium Components]
+    C --> J[Professional Evaluations]
+    C --> K[Custom Firmware]
+    D --> L[Full Patent Access]
+    D --> M[Custom Parts]
+    D --> N[Enterprise Support]
     style B fill:#e6f3ff,stroke:#333
     style C fill:#b3d9ff,stroke:#333
-    style G fill:#ffd700
-    style I fill:#ffd700
+    style D fill:#80bfff,stroke:#333
+    style H fill:#ffd700
+    style J fill:#ffd700
 ```
 
 # Customer Journey
@@ -196,7 +200,7 @@ journey
 
 ## Revenue Streams
 - Monthly subscriptions
-- Pro parts upgrades
+- Professional parts upgrades
 - Maintenance services
 - Patent licensing
 
