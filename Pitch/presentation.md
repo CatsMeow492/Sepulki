@@ -105,48 +105,34 @@ graph LR
 
 # Go-to-Market Strategy
 
+# Component Strategy - Table
+
+| Standard Tier         | Pro Tier             |
+|-----------------------|----------------------|
+| Basic Components      | Patented Designs     |
+| Common Parts          | Premium Parts        |
+| Open-Source Software  | Custom Firmware      |
+| Basic Support         | Priority Support     |
+|                       | Advanced Analytics   |
+
+# Component Strategy - Diagram
+
 ```mermaid
-graph TD
-    A[Market Entry] --> B[Phase 1: Direct Sales]
-    A --> C[Phase 2: Channel Partners]
-    B --> D[SMB Manufacturing]
-    B --> E[Warehousing]
-    C --> F[System Integrators]
-    C --> G[Industry Consultants]
-    style A fill:#f9f,stroke:#333
-    style B fill:#bbf,stroke:#333
-    style C fill:#bbf,stroke:#333
-```
-
----
-
-  # Component Strategy
-  
-- | Standard Tier         | Pro Tier             |
-- |-----------------------|----------------------|
-- | Basic Components      | Patented Designs     |
-- | Common Parts          | Premium Parts        | 
-- | Open-Source Software  | Custom Firmware      |
-- | Basic Support          | Priority Support     |
-- |                       | Advanced Analytics   |
-+ ```mermaid
-+ graph TB
-+     A[Parts Library] --> B[Standard Tier]
-+     A --> C[Pro Tier]
-+     B --> D[Basic Components]
-+     B --> E[Common Parts]
-+     B --> F[Open-Source Software]
-+     C --> G[Patented Parts]
-+     C --> H[Premium Components]
-+     C --> I[Professional Evaluations]
-+     C --> J[Custom Firmware]
-+     C --> K[Priority Support]
-+     style B fill:#e6f3ff,stroke:#333
-+     style C fill:#b3d9ff,stroke:#333
-+     style G fill:#ffd700
-+     style I fill:#ffd700
-+ ```
----
+graph TB
+    A[Parts Library] --> B[Standard Tier]
+    A --> C[Pro Tier]
+    B --> D[Basic Components]
+    B --> E[Common Parts]
+    B --> F[Open-Source Software]
+    C --> G[Patented Parts]
+    C --> H[Premium Components]
+    C --> I[Professional Evaluations]
+    C --> J[Custom Firmware]
+    C --> K[Priority Support]
+    style B fill:#e6f3ff,stroke:#333
+    style C fill:#b3d9ff,stroke:#333
+    style G fill:#ffd700
+    style I fill:#ffd700
 
 # Customer Journey
 
