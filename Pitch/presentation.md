@@ -120,9 +120,34 @@ graph TD
 
 ---
 
-# Component Strategy
-
-![Component Strategy](assets/component-strategy.svg)
+  # Component Strategy
+  
+- | Standard Tier         | Pro Tier             |
+- |-----------------------|----------------------|
+- | Basic Components      | Patented Designs     |
+- | Common Parts          | Premium Parts        | 
+- | Open-Source Software  | Custom Firmware      |
+- | Basic Support          | Priority Support     |
+- |                       | Advanced Analytics   |
++ ```mermaid
++ graph TB
++     A[Parts Library] --> B[Standard Tier]
++     A --> C[Pro Tier]
++     B --> D[Basic Components]
++     B --> E[Common Parts]
++     B --> F[Open-Source Software]
++     C --> G[Patented Parts]
++     C --> H[Premium Components]
++     C --> I[Professional Evaluations]
++     C --> J[Custom Firmware]
++     C --> K[Priority Support]
++     style B fill:#e6f3ff,stroke:#333
++     style C fill:#b3d9ff,stroke:#333
++     style G fill:#ffd700
++     style I fill:#ffd700
++ ```
+  
+  ---
 
 ---
 
