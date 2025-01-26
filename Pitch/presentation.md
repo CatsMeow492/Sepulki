@@ -3,7 +3,7 @@ marp: true
 theme: default
 paginate: true
 mermaid: true
-header: "Robo-tricks"
+header: "Art|Fix"
 footer: "Confidential - 2024"
 style: |
   section {
@@ -15,8 +15,8 @@ style: |
   }
 ---
 
-# Robo-tricks
-## Democratizing Industrial Robotics
+# Art|Fix
+## Democratizing Robotics
 ![width:200px](assets/logo.png)
 
 ---
@@ -31,7 +31,7 @@ style: |
 ---
 
 # Our Solution
-Robo-tricks: AI-Powered Robot Design & Management
+Art|Fix: AI-Powered Robot Design & Management
 
 - **Automated Design:** RAG model for optimal configurations
 - **Standardized Components:** Modular, plug-and-play parts
@@ -42,7 +42,7 @@ Robo-tricks: AI-Powered Robot Design & Management
 
 # Competitive Landscape
 
-| Feature                   | Traditional Integrators | Robo-tricks | Startup Competitors |
+| Feature                   | Traditional Integrators | Art|Fix | Startup Competitors |
 |---------------------------|-------------------------|-------------|----------------------|
 | Deployment Time           | 6-9 months              | 3 weeks    | 2-4 months        
 | Upfront Cost              | $250k+                  | $0         | $50k+             
@@ -130,14 +130,14 @@ graph TD
 
 ```mermaid
 journey
-    title Robo-tricks Implementation Process & Confidence Levels
+    title Art|Fix Implementation Process & Confidence Levels
     section Discovery
       Initial Contact: 2: Customer
       Requirements Gathering: 2: Customer, Sales
       Solution Design: 5: AI System
     section Implementation
       Component Selection: 5: Customer, AI
-      Assembly: 3: Robo-tricks
+      Assembly: 3: Art|Fix
       Deployment: 4: Support
     section Ongoing
       Maintenance: 3: Support
@@ -154,7 +154,7 @@ journey
 - Limited flexibility
 - Expertise required
 
-## Robo-tricks
+## Art|Fix
 - Pay-as-you-go model
 - AI-driven design
 - Modular components
@@ -252,7 +252,7 @@ graph LR
 
 ```mermaid
 gantt
-    title Robo-tricks Development Timeline
+    title Art|Fix Development Timeline
     dateFormat  YYYY-MM
     section Core Tech
     RAG Model v1.0       :done,    des1, 2025-01, 2025-03
