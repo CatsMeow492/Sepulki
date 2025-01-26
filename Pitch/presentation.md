@@ -133,22 +133,15 @@ graph TB
     D --> M[Custom Parts]
     D --> N[Enterprise Support]
     
-    style B fill:#e6f3ff,stroke:#333
-    style C fill:#b3d9ff,stroke:#333
-    style D fill:#80bfff,stroke:#333
-    style H stroke:#ffd700,stroke-width:3px
-    style J stroke:#ffd700,stroke-width:3px
-    style L stroke:#ffd700,stroke-width:3px
-    style M stroke:#ffd700,stroke-width:3px
-    style N stroke:#ffd700,stroke-width:3px
+    classDef tierHeader fill:#f0f8ff,stroke:#1e90ff,stroke-width:2px,color:#2c3e50,font-weight:bold
+    classDef goldBorder stroke:#ffd700,stroke-width:3px
     
-    classDef goldBorder stroke:#ffd700,stroke-width:3px;
-    class H,J,L,M,N goldBorder;
+    style B fill:#e6f3ff,stroke:#333,color:#2c3e50,font-weight:bold
+    style C fill:#b3d9ff,stroke:#333,color:#2c3e50,font-weight:bold
+    style D fill:#80bfff,stroke:#333,color:#2c3e50,font-weight:bold
     
-    subgraph Legend
-        direction TB
-        leg1[Key Differentiators]:::goldBorder
-    end
+    class B,C,D tierHeader
+    class H,J,L,M,N goldBorder
 ```
 
 # Customer Journey
