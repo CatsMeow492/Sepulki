@@ -132,11 +132,23 @@ graph TB
     D --> L[Full Patent Access]
     D --> M[Custom Parts]
     D --> N[Enterprise Support]
+    
     style B fill:#e6f3ff,stroke:#333
     style C fill:#b3d9ff,stroke:#333
     style D fill:#80bfff,stroke:#333
-    style H fill:#ffd700
-    style J fill:#ffd700
+    style H stroke:#ffd700,stroke-width:3px
+    style J stroke:#ffd700,stroke-width:3px
+    style L stroke:#ffd700,stroke-width:3px
+    style M stroke:#ffd700,stroke-width:3px
+    style N stroke:#ffd700,stroke-width:3px
+    
+    classDef goldBorder stroke:#ffd700,stroke-width:3px;
+    class H,J,L,M,N goldBorder;
+    
+    subgraph Legend
+        direction TB
+        leg1[Key Differentiators]:::goldBorder
+    end
 ```
 
 # Customer Journey
