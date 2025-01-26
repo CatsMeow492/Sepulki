@@ -146,9 +146,6 @@ graph TD
 +     style G fill:#ffd700
 +     style I fill:#ffd700
 + ```
-  
-  ---
-
 ---
 
 # Customer Journey
