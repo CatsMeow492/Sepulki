@@ -79,13 +79,21 @@ function ConfigureContent() {
   }, [searchParams, router]);
 
   const loadSample = () => {
-    // For MVP, load a static URDF with primitive shapes served from public/
+    // MVP: use primitives-only URDF to avoid external mesh loaders
     const sampleUrl = '/robots/sample-arm-01/urdf/sample.urdf'
     setBuiltUrdf(sampleUrl)
     setBuiltSpec(undefined)
     setUrdfText(sampleUrl)
     setSourceTab('urdf')
   }
+
+  // Auto-load a sample model once analysis is present (MVP: AI-prepopulated view)
+  useEffect(() => {
+    if (analysis && !builtUrdf && !builtSpec) {
+      loadSample()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis])
 
   const buildModel = () => {
     try {
@@ -243,7 +251,7 @@ function ConfigureContent() {
 
         {/* Right Column - 3D Visualization */}
         <div className="bg-gray-50 rounded-lg p-6">
-          <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden">
+          <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden relative">
             <Scene3D
               spec={builtSpec}
               urdf={builtUrdf}
@@ -253,9 +261,9 @@ function ConfigureContent() {
                 duration: 4,
                 loop: true,
                 frames: [
-                  { t: 0, pose: { joint1: 0 } },
-                  { t: 2, pose: { joint1: 1.2 } },
-                  { t: 4, pose: { joint1: 0 } },
+                  { t: 0, pose: { joint1: 0, joint2: 0 } },
+                  { t: 2, pose: { joint1: 1.0, joint2: 0.6 } },
+                  { t: 4, pose: { joint1: 0, joint2: 0 } },
                 ]
               } : undefined}
               playing={playing}
@@ -279,8 +287,8 @@ function ConfigureContent() {
             <div className="flex gap-2 mb-2">
               <button className={`px-3 py-1 rounded ${sourceTab === 'spec' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setSourceTab('spec')}>Spec JSON</button>
               <button className={`px-3 py-1 rounded ${sourceTab === 'urdf' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setSourceTab('urdf')}>URDF</button>
-              <button className="px-3 py-1 rounded bg-gray-900 text-white" onClick={loadSample}>Load Sample</button>
-              <button className="ml-auto px-3 py-1 rounded bg-blue-600 text-white" onClick={buildModel}>Build Model</button>
+              <button data-testid="load-sample" className="px-3 py-1 rounded bg-gray-900 text-white" onClick={loadSample}>Load Sample</button>
+              <button data-testid="build-model" className="ml-auto px-3 py-1 rounded bg-blue-600 text-white" onClick={buildModel}>Build Model</button>
             </div>
             {sourceTab === 'spec' ? (
               <textarea className="w-full h-40 text-sm font-mono p-2 rounded border" placeholder="Paste RobotSpec JSON here" value={specText} onChange={(e) => setSpecText(e.target.value)} />

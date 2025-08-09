@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Stage } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MotionProfile, RobotSpec } from '@/types/robot'
 import { specToUrdf } from '@/lib/specToUrdf'
@@ -43,8 +43,16 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   if (!playerRef.current) playerRef.current = new MotionPlayer()
-  if (profile) playerRef.current.loadProfile(profile)
-  playerRef.current.setRate(playbackRate)
+  // Load profile when it changes
+  useEffect(() => {
+    if (profile) {
+      playerRef.current?.loadProfile(profile)
+    }
+  }, [profile])
+  // Apply rate when it changes
+  useEffect(() => {
+    playerRef.current?.setRate(playbackRate)
+  }, [playbackRate])
 
   return (
     <>
@@ -55,11 +63,21 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
           }} />
         </div>
       )}
-      <Canvas shadows>
+      <Canvas shadows={false}>
       <color attach="background" args={['#1a1a1a']} />
       <PerspectiveCamera makeDefault position={[4, 4, 4]} fov={50} />
       <OrbitControls enablePan enableZoom enableRotate minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 2} />
-      <Stage intensity={0.5} environment="city" shadows={{ type: 'accumulative', color: '#d9d9d9', colorBlend: 2, opacity: 1 }} adjustCamera={false}>
+        {/* Environment and lightweight lights for realistic look */}
+        <Environment preset="warehouse" />
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 10, 5]} intensity={0.8} />
+
+        {/* Ground plane and contact shadow for spatial context */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <planeGeometry args={[20, 20]} />
+          <meshStandardMaterial color="#2b2b2b" metalness={0} roughness={1} />
+        </mesh>
+        <ContactShadows position={[0, -0.01, 0]} opacity={0.5} width={10} height={10} blur={2.5} far={5} />
         {builtUrdf ? (
           <RobotModel
             urdf={builtUrdf}
@@ -75,7 +93,6 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
             }}
           />
         ) : null}
-      </Stage>
       {/* Minimal deterministic player loop */}
       {profile ? (
         <AnimationTicker onTick={(delta) => {

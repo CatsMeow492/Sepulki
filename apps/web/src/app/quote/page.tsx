@@ -11,6 +11,13 @@ const Scene3D = dynamic(
 
 export default function QuotePage() {
   const router = useRouter();
+  const [builtUrdf, setBuiltUrdf] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    // Auto-load the same sample model for the quote preview (MVP)
+    const sampleUrl = '/robots/sample-arm-01/urdf/sample.urdf'
+    setBuiltUrdf(sampleUrl)
+  }, [])
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-8">
@@ -19,7 +26,7 @@ export default function QuotePage() {
         <div className="space-y-8">
           {/* 3D Preview */}
           <div className="bg-gray-100 rounded-lg p-4 aspect-square">
-            <Scene3D />
+            <Scene3D urdf={builtUrdf} assetBaseUrl="/robots/sample-arm-01" />
           </div>
 
           {/* Specifications Summary */}

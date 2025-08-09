@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest --config ./jest.config.js --passWithNoTests"
+    "test": "jest --config ./jest.config.js --passWithNoTests",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@react-three/drei": "^9.121.4",

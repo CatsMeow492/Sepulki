@@ -27,7 +27,9 @@ export function JointControls({
       {joints.map((j) => {
         const min = j.min ?? -Math.PI
         const max = j.max ?? Math.PI
-        const val = local[j.name] ?? j.value
+        const rawVal = local[j.name] ?? j.value
+        const val = typeof rawVal === 'number' ? rawVal : Number(rawVal)
+        const safeVal = Number.isFinite(val) ? val : 0
         return (
           <div key={j.name} className="flex items-center gap-3">
             <label className="w-32 text-sm text-gray-700">{j.name}</label>
@@ -36,7 +38,7 @@ export function JointControls({
               min={min}
               max={max}
               step={0.01}
-              value={val}
+              value={safeVal}
               onChange={(e) => {
                 const v = Math.max(min, Math.min(max, Number(e.target.value)))
                 setLocal((s) => ({ ...s, [j.name]: v }))
@@ -44,7 +46,7 @@ export function JointControls({
               }}
               className="flex-1"
             />
-            <span className="w-20 text-right text-xs text-gray-600">{val.toFixed(2)}</span>
+            <span className="w-20 text-right text-xs text-gray-600">{safeVal.toFixed(2)}</span>
           </div>
         )
       })}

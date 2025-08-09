@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Group, Mesh, MeshBasicMaterial, BoxGeometry } from 'three'
 import { useThree } from '@react-three/fiber'
 import URDFLoader from 'urdf-loader'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 
 type JointMeta = { name: string; limit?: { lower: number; upper: number } }
 
@@ -24,6 +25,22 @@ export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
   const { scene } = useThree()
 
   useEffect(() => {
+    // Provide a basic mesh loader so URDF can resolve OBJ assets when used
+    ;(loader as any).loadMeshCb = (
+      path: string,
+      manager: any,
+      onComplete: (obj: any) => void,
+    ) => {
+      const objLoader = new OBJLoader(manager as any)
+      objLoader.load(
+        path,
+        (obj) => onComplete(obj),
+        undefined,
+        () => onComplete(new Group()),
+      )
+    }
+
+    // Memoized loader and stringified URL for stability
     loader.load(
       typeof urdf === 'string' ? urdf : urdf.toString(),
       (result: any) => {
@@ -70,6 +87,7 @@ export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
   useEffect(() => {
     if (robot && groupRef.current) {
       groupRef.current.add(robot)
+      // Notify once when robot is first added
       onLoaded?.(api)
     }
     return () => {
@@ -77,7 +95,7 @@ export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
         groupRef.current.remove(robot)
       }
     }
-  }, [robot, api, onLoaded])
+  }, [robot])
 
   useEffect(() => {
     if (!robot) return
