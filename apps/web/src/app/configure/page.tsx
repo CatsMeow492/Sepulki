@@ -1,8 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import type { RobotSpec } from '@/types/robot';
+import { JointControls } from '@/components';
 
 // Dynamically import the Scene3D component with SSR disabled
 const Scene3D = dynamic(
@@ -44,6 +46,18 @@ function ConfigureContent() {
   const [currentStep, setCurrentStep] = useState<number>(2);
   const [analysis, setAnalysis] = useState<string>('');
   const [userInput, setUserInput] = useState<string>('');
+  const [sourceTab, setSourceTab] = useState<'spec' | 'urdf'>('spec');
+  const [specText, setSpecText] = useState<string>('');
+  const [urdfText, setUrdfText] = useState<string>('');
+  const [builtSpec, setBuiltSpec] = useState<RobotSpec | undefined>(undefined);
+  const [builtUrdf, setBuiltUrdf] = useState<string | undefined>(undefined);
+  const [jointSnapshot, setJointSnapshot] = useState<{ name: string; value: number; min?: number; max?: number }[]>([]);
+  const robotApiRef = useRef<{
+    getJoint: (name: string) => any
+    setJointValue: (name: string, value: number) => void
+    getJointValue: (name: string) => number
+    listJoints: () => { name: string; limit?: { lower: number; upper: number } }[]
+  } | null>(null)
 
   useEffect(() => {
     const step = Number(searchParams.get('step')) || 2;
@@ -60,6 +74,31 @@ function ConfigureContent() {
     setAnalysis(storedAnalysis);
     setUserInput(storedInput);
   }, [searchParams, router]);
+
+  const loadSample = () => {
+    // For MVP, load a static URDF with primitive shapes served from public/
+    const sampleUrl = '/robots/sample-arm-01/urdf/sample.urdf'
+    setBuiltUrdf(sampleUrl)
+    setBuiltSpec(undefined)
+    setUrdfText(sampleUrl)
+    setSourceTab('urdf')
+  }
+
+  const buildModel = () => {
+    try {
+      if (sourceTab === 'spec' && specText.trim()) {
+        const parsed = JSON.parse(specText) as RobotSpec
+        setBuiltSpec(parsed)
+        setBuiltUrdf(undefined)
+      } else if (sourceTab === 'urdf' && urdfText.trim()) {
+        setBuiltUrdf(urdfText)
+        setBuiltSpec(undefined)
+      }
+    } catch (e) {
+      // minimal MVP: ignore detailed error surfacing
+      console.error(e)
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -202,8 +241,47 @@ function ConfigureContent() {
         {/* Right Column - 3D Visualization */}
         <div className="bg-gray-50 rounded-lg p-6">
           <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden">
-            <Scene3D />
+            <Scene3D
+              spec={builtSpec}
+              urdf={builtUrdf}
+              assetBaseUrl="/robots/sample-arm-01"
+              onRobotApi={(api) => {
+                robotApiRef.current = api
+                const joints = api.listJoints()
+                const snapshot = joints.map((j) => ({
+                  name: j.name,
+                  value: api.getJointValue(j.name),
+                  min: j.limit?.lower,
+                  max: j.limit?.upper,
+                }))
+                setJointSnapshot(snapshot)
+              }}
+            />
           </div>
+          {/* Source selector + inputs */}
+          <div className="mt-4">
+            <div className="flex gap-2 mb-2">
+              <button className={`px-3 py-1 rounded ${sourceTab === 'spec' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setSourceTab('spec')}>Spec JSON</button>
+              <button className={`px-3 py-1 rounded ${sourceTab === 'urdf' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setSourceTab('urdf')}>URDF</button>
+              <button className="px-3 py-1 rounded bg-gray-900 text-white" onClick={loadSample}>Load Sample</button>
+              <button className="ml-auto px-3 py-1 rounded bg-blue-600 text-white" onClick={buildModel}>Build Model</button>
+            </div>
+            {sourceTab === 'spec' ? (
+              <textarea className="w-full h-40 text-sm font-mono p-2 rounded border" placeholder="Paste RobotSpec JSON here" value={specText} onChange={(e) => setSpecText(e.target.value)} />
+            ) : (
+              <textarea className="w-full h-40 text-sm font-mono p-2 rounded border" placeholder="Paste URDF XML here" value={urdfText} onChange={(e) => setUrdfText(e.target.value)} />
+            )}
+          </div>
+          {/* Joint controls */}
+          {jointSnapshot.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-gray-800 mb-2">Joint Controls</h3>
+              <JointControls joints={jointSnapshot} onChange={(name, value) => {
+                robotApiRef.current?.setJointValue(name, value)
+                setJointSnapshot((prev) => prev.map((j) => (j.name === name ? { ...j, value } : j)))
+              }} />
+            </div>
+          )}
           <div className="mt-4 flex justify-center space-x-4">
             <button className="p-2 text-gray-500 hover:text-gray-700">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

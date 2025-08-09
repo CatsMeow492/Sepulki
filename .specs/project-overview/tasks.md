@@ -19,41 +19,41 @@ Legend of requirements (short refs):
 ---
 
 1) Tooling & dependencies (setup)
-- [ ] Install runtime deps: `npm i -w @artifex/web urdf-loader`
-- [ ] Install test deps: `npm i -D -w @artifex/web jest @types/jest ts-jest jest-environment-jsdom jest-canvas-mock`
-- [ ] Install e2e deps: `npm i -D -w @artifex/web @playwright/test`
-- [ ] Add Jest config (jsdom), setup `jest-canvas-mock`, and a `test` script in `apps/web/package.json`.
+- [x] Install runtime deps: `npm i -w @artifex/web urdf-loader`
+- [x] Install test deps: `npm i -D -w @artifex/web jest @types/jest ts-jest jest-environment-jsdom jest-canvas-mock`
+- [x] Install e2e deps: `npm i -D -w @artifex/web @playwright/test`
+- [x] Add Jest config (jsdom), setup `jest-canvas-mock`, and a `test` script in `apps/web/package.json`.
 - References: R-VAL-STRUCTURED, R-DET-POSE (enables TDD baseline)
 
 2) Types and contracts
-- [ ] Create `apps/web/src/types/robot.ts` with `RobotSpec`, `JointSpec`, `LinkSpec`, `JointLimit`, `MotionProfile`, etc. (from design)
+- [x] Create `apps/web/src/types/robot.ts` with `RobotSpec`, `JointSpec`, `LinkSpec`, `JointLimit`, `MotionProfile`, etc. (from design)
 - [ ] Add ambient type for `urdf-loader` if needed: `apps/web/src/types/urdf-loader.d.ts` declaring `module 'urdf-loader'`.
 - References: R-KM-FK, R-KM-PLAYBACK
 
 3) Spec→URDF transformer (unit-tested first)
-- [ ] Create `apps/web/src/lib/specToUrdf.ts` exporting `specToUrdf(spec: RobotSpec, baseUrl?: string): string`.
+- [x] Create `apps/web/src/lib/specToUrdf.ts` exporting `specToUrdf(spec: RobotSpec, baseUrl?: string): string`.
 - [ ] Unit tests: valid minimal spec → URDF string contains links/joints/limits and mesh refs; invalid refs → throws with structured error type.
 - References: R-LR-URDF, R-VAL-STRUCTURED
 
 4) Motion player (deterministic clock)
-- [ ] Create `apps/web/src/lib/motionPlayer.ts` with APIs: `loadProfile`, `play`, `pause`, `seek`, `getTime`, `sample(t)`.
+- [x] Create `apps/web/src/lib/motionPlayer.ts` with APIs: `loadProfile`, `play`, `pause`, `seek`, `getTime`, `sample(t)`.
 - [ ] Unit tests: deterministic interpolation (t=0, mid, end), loop behavior, seek boundaries.
 - References: R-KM-PLAYBACK, R-DET-POSE
 
 5) RobotModel (URDF ingestion wrapper)
-- [ ] Create `apps/web/src/components/RobotModel.tsx` that loads URDF via `URDFLoader` and exposes a joint control API via `ref`/callbacks.
-- [ ] Support: missing mesh → placeholder node + non-blocking error callback; expose `getJoint(name)`, `setJointValue(name, v)`.
+- [x] Create `apps/web/src/components/RobotModel.tsx` that loads URDF via `URDFLoader` and exposes a joint control API via `ref`/callbacks.
+- [x] Support: missing mesh → placeholder node + non-blocking error callback; expose `getJoint(name)`, `setJointValue(name, v)`.
 - [ ] Smoke test (component): render in jsdom with `jest-canvas-mock` and assert mount + error path.
 - References: R-LR-URDF, R-LR-PLACEHOLDER, R-KM-FK
 
 6) Replace Scene3D with prop-driven host
-- [ ] Refactor `apps/web/src/components/Scene3D.tsx` to accept props: `{ spec?: RobotSpec; urdf?: string | URL; assetBaseUrl?: string; showAxes?: boolean; profile?: MotionProfile; }`.
-- [ ] Build URDF from `spec` using `specToUrdf` (when provided); then render `<RobotModel>`; keep `OrbitControls`, lights; add reset view button/helper.
+- [x] Refactor `apps/web/src/components/Scene3D.tsx` to accept props: `{ spec?: RobotSpec; urdf?: string | URL; assetBaseUrl?: string; showAxes?: boolean; profile?: MotionProfile; }`.
+- [x] Build URDF from `spec` using `specToUrdf` (when provided); then render `<RobotModel>`; keep `OrbitControls`, lights; add reset view button/helper.
 - [ ] Ensure deterministic render loop; avoid per-frame allocations; memoize loaders.
 - References: R-LR-URDF, R-LR-CAMERA, R-PERF-30FPS, R-DET-POSE
 
 7) JointControls UI
-- [ ] Create `apps/web/src/components/JointControls.tsx` with sliders: show min/max from limits, clamp on input, visual warn on clamp.
+- [x] Create `apps/web/src/components/JointControls.tsx` with sliders: show min/max from limits, clamp on input, visual warn on clamp.
 - [ ] Component tests: clamping and value reflection.
 - References: R-INT-UI, R-KM-JOINT-UPDATE, R-KM-LIMIT-WARN
 
@@ -62,17 +62,17 @@ Legend of requirements (short refs):
 - [ ] Wire into `Scene3D` for URDF load failures.
 - References: R-VAL-STRUCTURED, R-VAL-CRITICAL
 
-9) Configure page wiring
-- [ ] Update `apps/web/src/app/configure/page.tsx` to pass props into `Scene3D` (SSR disabled import remains).
-- [ ] Add a source selector (tabs): "Spec JSON" and "URDF"; textarea inputs and a "Build Model" button.
-- [ ] Render `JointControls` below the canvas; wire to `RobotModel` via callbacks from `Scene3D`.
+- 9) Configure page wiring
+- [x] Update `apps/web/src/app/configure/page.tsx` to pass props into `Scene3D` (SSR disabled import remains).
+- [x] Add a source selector (tabs): "Spec JSON" and "URDF"; textarea inputs and a "Build Model" button.
+- [x] Render `JointControls` below the canvas; wire to `RobotModel` via callbacks from `Scene3D`.
 - [ ] Add simple playback controls (Play/Pause, scrub slider, playback rate) calling `motionPlayer` via `Scene3D`.
 - References: R-INT-UI, R-KM-PLAYBACK, R-KM-FK
 
 10) Sample assets and samples
-- [ ] Add sample folder: `apps/web/public/robots/sample-arm-01/{links,textures,urdf}` (binary `.glb` meshes for 2–3 links, or use URDF primitive shapes for MVP).
-- [ ] Add `apps/web/public/robots/sample-arm-01/urdf/sample.urdf` (optional); also add a `sampleSpec.json` to be converted at runtime.
-- [ ] Verify `assetBaseUrl = '/robots/sample-arm-01'` pathing in `specToUrdf` and URDF refs.
+- [x] Add sample folder: `apps/web/public/robots/sample-arm-01/{links,textures,urdf}` (binary `.glb` meshes for 2–3 links, or use URDF primitive shapes for MVP).
+- [x] Add `apps/web/public/robots/sample-arm-01/urdf/sample.urdf` (optional); also add a `sampleSpec.json` to be converted at runtime.
+- [x] Verify `assetBaseUrl = '/robots/sample-arm-01'` pathing in `specToUrdf` and URDF refs.
 - References: R-LR-URDF, R-LR-PLACEHOLDER
 
 11) E2E smoke (Playwright)

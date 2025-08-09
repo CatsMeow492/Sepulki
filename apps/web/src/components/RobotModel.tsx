@@ -1,0 +1,91 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Group, Mesh, MeshBasicMaterial, BoxGeometry } from 'three'
+import { useThree } from '@react-three/fiber'
+import URDFLoader from 'urdf-loader'
+
+type JointMeta = { name: string; limit?: { lower: number; upper: number } }
+
+type RobotApi = {
+  getJoint: (name: string) => any
+  setJointValue: (name: string, value: number) => void
+  getJointValue: (name: string) => number
+  listJoints: () => JointMeta[]
+}
+
+export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
+  urdf: string | URL
+  onLoaded?: (api: RobotApi) => void
+  onError?: (error: Error | string) => void
+  showAxes?: boolean
+}) {
+  const groupRef = useRef<Group>(null)
+  const [loader] = useState(() => new URDFLoader())
+  const [robot, setRobot] = useState<any>(null)
+  const { scene } = useThree()
+
+  useEffect(() => {
+    loader.load(
+      typeof urdf === 'string' ? urdf : urdf.toString(),
+      (result: any) => {
+        setRobot(result)
+      },
+      undefined,
+      (e) => {
+        // On error, attach a simple placeholder
+        const placeholder = new Group()
+        const mesh = new Mesh(new BoxGeometry(0.3, 0.3, 0.3), new MeshBasicMaterial({ color: 'red' }))
+        placeholder.add(mesh)
+        if (groupRef.current) groupRef.current.add(placeholder)
+        onError?.(e instanceof Error ? e : 'ASSET_NOT_FOUND')
+      },
+    )
+  }, [loader, urdf])
+
+  const api: RobotApi = useMemo(() => ({
+    getJoint: (name: string) => robot?.joints?.[name],
+    setJointValue: (name: string, value: number) => {
+      const j = robot?.joints?.[name]
+      if (j) j.setJointValue?.(value)
+    },
+    getJointValue: (name: string) => {
+      const j = robot?.joints?.[name]
+      // urdf-loader joints often expose .jointValue or .angle
+      return (j?.jointValue ?? j?.angle ?? 0) as number
+    },
+    listJoints: () => {
+      if (!robot?.joints) return []
+      return Object.keys(robot.joints).map((name) => {
+        const j = robot.joints[name]
+        const limit = j?.limit
+        return {
+          name,
+          limit: limit && typeof limit.lower === 'number' && typeof limit.upper === 'number'
+            ? { lower: limit.lower, upper: limit.upper }
+            : undefined,
+        }
+      })
+    },
+  }), [robot])
+
+  useEffect(() => {
+    if (robot && groupRef.current) {
+      groupRef.current.add(robot)
+      onLoaded?.(api)
+    }
+    return () => {
+      if (robot && groupRef.current) {
+        groupRef.current.remove(robot)
+      }
+    }
+  }, [robot, api, onLoaded])
+
+  useEffect(() => {
+    if (!robot) return
+    robot.showAxes = showAxes
+    scene.updateMatrixWorld(true)
+  }, [robot, showAxes, scene])
+
+  return <group ref={groupRef} />
+}
+
+
