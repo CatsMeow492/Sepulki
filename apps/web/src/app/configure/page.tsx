@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
@@ -38,7 +38,7 @@ const useCaseExamples = [
   }
 ];
 
-export default function ConfigurePage() {
+function ConfigureContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<number>(2);
@@ -244,3 +244,11 @@ export default function ConfigurePage() {
     </div>
   );
 } 
+
+export default function ConfigurePage() {
+  return (
+    <Suspense fallback={<div className="max-w-7xl mx-auto px-4 py-8">Loading...</div>}>
+      <ConfigureContent />
+    </Suspense>
+  );
+}

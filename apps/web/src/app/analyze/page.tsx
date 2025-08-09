@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,7 +12,7 @@ interface CodeProps {
   children?: React.ReactNode;
 }
 
-export default function AnalyzePage() {
+function AnalyzeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [analysis, setAnalysis] = useState<string>('');
@@ -171,3 +171,11 @@ export default function AnalyzePage() {
     </div>
   );
 } 
+
+export default function AnalyzePage() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl mx-auto px-4 py-12">Loading...</div>}>
+      <AnalyzeContent />
+    </Suspense>
+  );
+}

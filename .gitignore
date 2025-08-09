@@ -1,4 +1,7 @@
-Resume.txt
-./YCDocs
-/YCDocs
 node_modules
+.next
+out
+.vercel
+.env
+.env.local
+.DS_Store

@@ -1,0 +1,127 @@
+Taylor Mohney
+TaylorMohney@icloud.com 702-376-4552 in/taylormohney youngmohney.com
+SUMMARY
+Experienced Software Engineer with over 10 years of expertise in developing and deploying performant applications and RESTful APIs using
+JavaScript, Python, Go and various frameworks. Proficient in containerization with Docker and Kubernetes, with a strong background in cloud
+computing, machine learning, and AI. Committed to agile methodologies, test-driven development, and continuous integration practices. Find
+my work on the youngmohney.com domain: examcram.youngmohney.com, cardvault.youngmohney.com
+EXPERIENCE
+Lead Full Stack Developer
+Department of Defense February 2024 - Current Remote
+,
+Developed a peer-to-peer video conferencing application using WebRTC, React, and TypeScript, achieving 99.9% uptime in production.
+•
+Engineered a custom signaling server in Go to manage multi-user video chat coordination, supporting seamless communication for up to 100
+concurrent users.
+•
+Designed a scalable mesh network topology to support N-to-N peer connections, reducing connection latency by 30% and improving overall
+video call quality.
+•
+Implemented WebSocket for real-time communication and ICE protocol for NAT traversal, increasing connection success rates by 25%.
+•
+Spearheaded the development of a secure RESTful API using Node.js and Express, facilitating data exchange for a sensitive data processing
+application with an encryption layer that enhanced data confidentiality by 50%.
+•
+Senior Full Stack Developer - Angular, React, Node, Python
+USDA January 2022 - February 2024 Remote, Missouri
+,
+Led the design and implementation of scalable, data-driven applications, reducing software bugs by 35% and accelerating feature delivery
+timelines by 20%.
+•
+Designed and developed microservices using Angular and FastAPI, integrating with AWS Lambda and API Gateway to enable seamless
+communication between architectural components.
+•
+Streamlined backend processes by developing Python-based APIs, enhancing system performance and reliability, resulting in a 25%
+reduction in latency for key workflows.
+•
+•Migrated critical features to a modular architecture using Angular, React, and AWS services, improving maintainability and deployment
+efficiency by 40%.
+•
+Engineered end-to-end web solutions leveraging Angular, React, Node, and Python, leading to a 50% increase in user engagement and a 30%
+boost in application responsiveness.
+•
+Full Stack/Web3 Developer – Solidity, React, Node, AWS
+Coinbase May 2021 - December 2022 Remote, New York
+,
+Engineered a Web3 dApp with advanced security features, performing in-depth mempool analysis to ensure platform scalability and
+reliability for high transaction volumes.
+•
+Directed a team in developing and launching a cutting-edge NFT marketplace using React, Web3.js, and Golang, reducing time-to-market by
+30%.
+•
+Strategized and implemented features that drove a 20% increase in quarterly revenue, enhancing user engagement and marketplace
+transactions.
+•
+Architected and deployed smart contracts on Ethereum blockchain using Solidity, leveraging AWS infrastructure to handle over 500,000
+transactions monthly, ensuring robust security and scalability for decentralized applications.
+•
+Integrated DeFi protocols into the platform, enabling automatic yield farming and token swapping, which increased user transaction volume
+by 25% and improved asset liquidity within decentralized exchanges.
+•
+Contract Software Engineer
+Apple November 2020 - May 2021 Remote
+,
+Developed and deployed AI-based chatbots leveraging LLMs (OpenAI, Anthropic, etc.) with agent capabilities, improving customer query
+resolution time by 20%.
+•
+.
+.
+Built and maintained DevOps pipelines for AI/ML applications using AWS services including SageMaker, Lambda, and ECS, reducing
+deployment time by 40%.
+•
+Designed and implemented scalable AI workflows integrating AWS-hosted and private LLM solutions, enhancing automation and compliance
+for enterprise clients.
+•
+Collaborated with cross-functional teams to gather requirements and troubleshoot AI/ML integration issues, achieving a 30% reduction in
+project delivery time.
+•
+Lead Software Developer
+The Blockchain Co.
+December 2017 - November 2020 Remote, California
+,
+Designed and implemented a scalable architecture for blockchain-based payment systems, enhancing operational efficiency and reducing
+downtime by 40%.
+•
+Conducted rigorous code reviews and established best practices for secure smart contract development, preventing vulnerabilities and
+enhancing code quality.
+•
+Collaborated with cross-functional teams to integrate blockchain technology with existing payment gateways, streamlining adoption for
+businesses.
+•
+Enhanced system reliability through automated testing pipelines, achieving a 90% reduction in critical bugs post-deployment.
+•
+Spearheaded adoption of emerging blockchain consensus protocols, improving transaction validation speed and network security.
+•
+EDUCATION
+B.S. in Computer Science
+University of Nevada Las Vegas • Las Vegas, Nevada • August 2015 - May 2017 • 3.54
+3.54 GPA.
+•
+CERTIFICATIONS
+AWS Certified DevOps Engineer – Professional
+Amazon Web Services Training and Certification • 2025
+Certified in AWS DevOps technologies and applications
+•
+AWS Machine Learning Certification
+Amazon Web Services • 2025
+Certified in Machine Learning and Artificial Intelligence training and application with AWS technologies
+•
+Certified in data preparation and analysis/science with AWS technologies
+•
+AWS Certified Developer – Associate
+Amazon Web Services Training and Certification • 2023
+Certified in development with all AWS technologies
+•
+Application of Cloud and Serverless technologies
+•
+AWS Certified Cloud Practitioner
+Amazon Web Services Training and Certification • 2022
+Certified in AWS cloud technologies and their application
+•
+SKILLS
+AI/ML: OpenAI, MLFlow, VLLM, Langchain, RAG
+Backend: Go, Python, Javascript, Typescript, Node, Express, FastAPI, Django
+Blockchain: Rust, Solidity, Web3JS
+Front End: HTML, CSS, Typescript, Javascript, React, Angular, Next
+.
+.
