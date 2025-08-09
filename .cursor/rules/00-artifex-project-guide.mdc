@@ -1,0 +1,73 @@
+---
+alwaysApply: true
+---
+# Artifex Project Guide
+
+## Purpose
+Artifex democratizes industrial robotics by using AI to design, configure, and manage robotic systems end‑to‑end.
+- Automated design via RAG model and standardized component library
+- Full lifecycle management (design → assembly → deployment → maintenance)
+- Subscription Hardware‑as‑a‑Service model
+- Initial markets: SMB manufacturing and warehousing; broader expansion thereafter
+
+References: pitch deck and investor materials live in `docs/pitch/SlideDeck.pdf` and `docs/investor-relations/InvestorPackage.pdf`.
+
+## Repository Structure
+- `apps/web`: Next.js 14 app (App Router)
+  - Pages: `app/`
+    - Entry: [`apps/web/src/app/page.tsx`](mdc:apps/web/src/app/page.tsx)
+    - Analyze: [`apps/web/src/app/analyze/page.tsx`](mdc:apps/web/src/app/analyze/page.tsx)
+    - Configure: [`apps/web/src/app/configure/page.tsx`](mdc:apps/web/src/app/configure/page.tsx)
+    - API route: [`apps/web/src/app/api/analyze/route.ts`](mdc:apps/web/src/app/api/analyze/route.ts)
+  - Components: [`apps/web/src/components/`](mdc:apps/web/src/components)
+  - OpenAI client: [`apps/web/src/lib/openai.ts`](mdc:apps/web/src/lib/openai.ts)
+- `docs/`: Product collateral and strategy docs
+  - `design/`, `pitch/`, `gtm-strategy/`, `yc-docs/`, `investor-relations/`
+- `packages/`: Placeholder for future shared libraries
+
+## Tech Stack
+- Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS
+- 3D/Visualization: `three`, `@react-three/fiber`, `@react-three/drei`
+- Markdown rendering: `react-markdown` + `remark-gfm`
+- OpenAI SDK for analysis endpoint
+
+Key configs:
+- Next config: [`apps/web/next.config.js`](mdc:apps/web/next.config.js)
+- Tailwind config: [`apps/web/tailwind.config.ts`](mdc:apps/web/tailwind.config.ts)
+- TS config (paths alias `@/*` → `apps/web/src/*`): [`apps/web/tsconfig.json`](mdc:apps/web/tsconfig.json)
+
+## Development
+Prereqs: Node >= 18.18.0
+
+- Install deps (workspaces):
+  - `npm i --workspaces`
+- Run dev server (port 3000):
+  - `npm run dev -w @artifex/web`
+- Build / start:
+  - `npm run build -w @artifex/web`
+  - `npm start -w @artifex/web`
+- Lint:
+  - `npm run lint -w @artifex/web`
+
+Environment:
+- Required: `OPENAI_API_KEY` (used in [`apps/web/src/lib/openai.ts`](mdc:apps/web/src/lib/openai.ts))
+- Place in `.env.local` at repo root or inside `apps/web`
+
+## Deployment
+- Use existing Vercel project for the frontend: “txr-monorepo” (do not create a new project)
+- From repo root: `vercel deploy` (ensure env vars are configured in Vercel)
+
+## Implementation Notes
+- When using `useSearchParams`, wrap client pages/components in `React.Suspense` to avoid prerender errors (already applied in analyze/configure pages).
+- 3D Scene uses dynamic import with `ssr: false` (`Scene3D`) to avoid SSR issues.
+- Keep presentational components in `src/components`; non-UI utilities in `src/lib`.
+- Global styles live in `apps/web/src/app/globals.css`.
+
+## Quickstart
+1) `npm i --workspaces`
+2) Create `.env.local` with `OPENAI_API_KEY`
+3) `npm run dev -w @artifex/web` and open http://localhost:3000
+
+## References
+- Root overview: [`README.md`](mdc:README.md)
+- Web app readme: [`apps/web/README.md`](mdc:apps/web/README.md)
