@@ -62,17 +62,18 @@ Legend of requirements (short refs):
 - [ ] Wire into `Scene3D` for URDF load failures.
 - References: R-VAL-STRUCTURED, R-VAL-CRITICAL
 
-- 9) Configure page wiring
+ 9) Configure page wiring
 - [x] Update `apps/web/src/app/configure/page.tsx` to pass props into `Scene3D` (SSR disabled import remains).
 - [x] Add a source selector (tabs): "Spec JSON" and "URDF"; textarea inputs and a "Build Model" button.
 - [x] Render `JointControls` below the canvas; wire to `RobotModel` via callbacks from `Scene3D`.
-- [ ] Add simple playback controls (Play/Pause, scrub slider, playback rate) calling `motionPlayer` via `Scene3D`.
+ - [x] Add simple playback controls (Play/Pause, scrub slider, playback rate) calling `motionPlayer` via `Scene3D`.
 - References: R-INT-UI, R-KM-PLAYBACK, R-KM-FK
 
 10) Sample assets and samples
 - [x] Add sample folder: `apps/web/public/robots/sample-arm-01/{links,textures,urdf}` (binary `.glb` meshes for 2–3 links, or use URDF primitive shapes for MVP).
 - [x] Add `apps/web/public/robots/sample-arm-01/urdf/sample.urdf` (optional); also add a `sampleSpec.json` to be converted at runtime.
 - [x] Verify `assetBaseUrl = '/robots/sample-arm-01'` pathing in `specToUrdf` and URDF refs.
+- [x] Add basic link meshes (`base.obj`, `link1.obj`) as stand-ins for `.glb`.
 - References: R-LR-URDF, R-LR-PLACEHOLDER
 
 11) E2E smoke (Playwright)

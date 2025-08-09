@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, Stage } from '@react-three/drei'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MotionProfile, RobotSpec } from '@/types/robot'
 import { specToUrdf } from '@/lib/specToUrdf'
 import { RobotModel } from './RobotModel'
@@ -19,9 +19,12 @@ type SceneProps = {
     listJoints: () => { name: string; limit?: { lower: number; upper: number } }[]
   }) => void
   onError?: (error: Error | string) => void
+  playing?: boolean
+  playbackRate?: number
+  seekTime?: number
 }
 
-export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi, onError, profile }: SceneProps) {
+export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi, onError, profile, playing = false, playbackRate = 1, seekTime }: SceneProps) {
   const builtUrdf = useMemo(() => {
     if (urdf) return typeof urdf === 'string' ? urdf : urdf.toString()
     if (spec) return specToUrdf(spec, assetBaseUrl)
@@ -39,6 +42,7 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
 
   if (!playerRef.current) playerRef.current = new MotionPlayer()
   if (profile) playerRef.current.loadProfile(profile)
+  playerRef.current.setRate(playbackRate)
 
   return (
     <Canvas shadows>
@@ -64,7 +68,11 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
           const player = playerRef.current
           const api = robotApiRef.current
           if (!player || !api) return
-          player.play()
+          if (seekTime != null) {
+            player.seek(seekTime)
+          }
+          if (playing) player.play()
+          else player.pause()
           player.tick(delta)
           const pose = player.sample()
           Object.entries(pose).forEach(([name, value]) => api.setJointValue(name, value))

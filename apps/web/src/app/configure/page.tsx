@@ -52,6 +52,9 @@ function ConfigureContent() {
   const [builtSpec, setBuiltSpec] = useState<RobotSpec | undefined>(undefined);
   const [builtUrdf, setBuiltUrdf] = useState<string | undefined>(undefined);
   const [jointSnapshot, setJointSnapshot] = useState<{ name: string; value: number; min?: number; max?: number }[]>([]);
+  const [playing, setPlaying] = useState(false)
+  const [rate, setRate] = useState(1)
+  const [seek, setSeek] = useState<number | undefined>(undefined)
   const robotApiRef = useRef<{
     getJoint: (name: string) => any
     setJointValue: (name: string, value: number) => void
@@ -245,6 +248,19 @@ function ConfigureContent() {
               spec={builtSpec}
               urdf={builtUrdf}
               assetBaseUrl="/robots/sample-arm-01"
+              profile={builtSpec ? {
+                name: 'demo',
+                duration: 4,
+                loop: true,
+                frames: [
+                  { t: 0, pose: { joint1: 0 } },
+                  { t: 2, pose: { joint1: 1.2 } },
+                  { t: 4, pose: { joint1: 0 } },
+                ]
+              } : undefined}
+              playing={playing}
+              playbackRate={rate}
+              seekTime={seek}
               onRobotApi={(api) => {
                 robotApiRef.current = api
                 const joints = api.listJoints()
@@ -272,6 +288,20 @@ function ConfigureContent() {
               <textarea className="w-full h-40 text-sm font-mono p-2 rounded border" placeholder="Paste URDF XML here" value={urdfText} onChange={(e) => setUrdfText(e.target.value)} />
             )}
           </div>
+          {/* Playback controls */}
+          <div className="mt-4 flex items-center gap-3">
+            <button className={`px-3 py-1 rounded ${playing ? 'bg-gray-200' : 'bg-blue-600 text-white'}`} onClick={() => setPlaying(true)}>Play</button>
+            <button className={`px-3 py-1 rounded ${!playing ? 'bg-gray-200' : 'bg-blue-600 text-white'}`} onClick={() => setPlaying(false)}>Pause</button>
+            <label className="ml-4 text-sm text-gray-700">Rate</label>
+            <select className="border rounded p-1 text-sm" value={rate} onChange={(e) => setRate(Number(e.target.value))}>
+              <option value={0.5}>0.5×</option>
+              <option value={1}>1×</option>
+              <option value={2}>2×</option>
+            </select>
+            <label className="ml-4 text-sm text-gray-700">Seek</label>
+            <input type="range" min={0} max={4} step={0.01} className="flex-1" onChange={(e) => setSeek(Number(e.target.value))} />
+          </div>
+
           {/* Joint controls */}
           {jointSnapshot.length > 0 && (
             <div className="mt-4">

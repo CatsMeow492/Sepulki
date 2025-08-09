@@ -3,14 +3,14 @@
   <link name="base">
     <visual>
       <geometry>
-        <box size="0.4 0.2 0.4"/>
+        <mesh filename="/robots/sample-arm-01/links/base.obj" />
       </geometry>
     </visual>
   </link>
   <link name="link1">
     <visual>
       <geometry>
-        <box size="0.2 0.8 0.2"/>
+        <mesh filename="/robots/sample-arm-01/links/link1.obj" />
       </geometry>
     </visual>
   </link>
