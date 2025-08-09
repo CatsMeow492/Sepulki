@@ -5,6 +5,7 @@ import type { MotionProfile, RobotSpec } from '@/types/robot'
 import { specToUrdf } from '@/lib/specToUrdf'
 import { RobotModel } from './RobotModel'
 import { MotionPlayer } from '@/lib/motionPlayer'
+import { ErrorBanner } from '@/components/ErrorBanner'
 
 type SceneProps = {
   spec?: RobotSpec
@@ -39,13 +40,22 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
     getJointValue: (name: string) => number
     listJoints: () => { name: string; limit?: { lower: number; upper: number } }[]
   } | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   if (!playerRef.current) playerRef.current = new MotionPlayer()
   if (profile) playerRef.current.loadProfile(profile)
   playerRef.current.setRate(playbackRate)
 
   return (
-    <Canvas shadows>
+    <>
+      {errorMsg && (
+        <div className="absolute left-0 right-0 top-0 z-10 p-3">
+          <ErrorBanner message={errorMsg} onRetry={() => {
+            setErrorMsg(null)
+          }} />
+        </div>
+      )}
+      <Canvas shadows>
       <color attach="background" args={['#1a1a1a']} />
       <PerspectiveCamera makeDefault position={[4, 4, 4]} fov={50} />
       <OrbitControls enablePan enableZoom enableRotate minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 2} />
@@ -58,7 +68,11 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
               robotApiRef.current = api
               onRobotApi?.(api)
             }}
-            onError={(e) => onError?.(e)}
+            onError={(e) => {
+              const msg = e instanceof Error ? e.message : String(e)
+              setErrorMsg(msg)
+              onError?.(e)
+            }}
           />
         ) : null}
       </Stage>
@@ -78,7 +92,8 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
           Object.entries(pose).forEach(([name, value]) => api.setJointValue(name, value))
         }} />
       ) : null}
-    </Canvas>
+      </Canvas>
+    </>
   )
 }
 

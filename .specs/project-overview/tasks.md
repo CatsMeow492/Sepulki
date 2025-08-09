@@ -58,8 +58,8 @@ Legend of requirements (short refs):
 - References: R-INT-UI, R-KM-JOINT-UPDATE, R-KM-LIMIT-WARN
 
 8) Basic ErrorBanner
-- [ ] Create `apps/web/src/components/ErrorBanner.tsx` for non-blocking errors (load/parse issues) with retry.
-- [ ] Wire into `Scene3D` for URDF load failures.
+- [x] Create `apps/web/src/components/ErrorBanner.tsx` for non-blocking errors (load/parse issues) with retry.
+- [x] Wire into `Scene3D` for URDF load failures.
 - References: R-VAL-STRUCTURED, R-VAL-CRITICAL
 
  9) Configure page wiring

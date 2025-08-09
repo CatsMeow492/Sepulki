@@ -1,3 +1,4 @@
 export { Scene3D } from './Scene3D' 
 export { RobotModel } from './RobotModel'
 export { JointControls } from './JointControls'
+export { ErrorBanner } from './ErrorBanner'
