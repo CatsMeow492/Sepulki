@@ -28,12 +28,16 @@ function AnalyzeContent() {
 
     const analyzeRequirements = async () => {
       try {
+        // Fetch catalog to include in prompt so LLM can propose real parts
+        const catalogRes = await fetch('/api/catalog', { cache: 'no-store' })
+        const catalogJson = await catalogRes.json()
+        const catalogText = JSON.stringify(catalogJson)
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ userInput }),
+          body: JSON.stringify({ userInput, catalogText }),
         });
 
         if (!response.ok) {

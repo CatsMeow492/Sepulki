@@ -3,7 +3,7 @@ import { analyzeRequirements } from '@/lib/openai';
 
 export async function POST(request: Request) {
   try {
-    const { userInput } = await request.json();
+    const { userInput, catalogText } = await request.json();
 
     if (!userInput) {
       return NextResponse.json(
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const analysis = await analyzeRequirements(userInput);
+    const analysis = await analyzeRequirements(userInput, catalogText);
 
     return NextResponse.json({ analysis });
   } catch (error) {

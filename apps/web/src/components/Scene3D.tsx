@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Environment, useGLTF } from '@react-three/drei'
+import { Box3, Vector3, Group } from 'three'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MotionProfile, RobotSpec } from '@/types/robot'
 import { specToUrdf } from '@/lib/specToUrdf'
@@ -23,9 +24,10 @@ type SceneProps = {
   playing?: boolean
   playbackRate?: number
   seekTime?: number
+  heroUrl?: string // when provided, render a static GLB hero instead of URDF
 }
 
-export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi, onError, profile, playing = false, playbackRate = 1, seekTime }: SceneProps) {
+export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi, onError, profile, playing = false, playbackRate = 1, seekTime, heroUrl }: SceneProps) {
   const builtUrdf = useMemo(() => {
     if (urdf) return typeof urdf === 'string' ? urdf : urdf.toString()
     if (spec) return specToUrdf(spec, assetBaseUrl)
@@ -41,6 +43,7 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
     listJoints: () => { name: string; limit?: { lower: number; upper: number } }[]
   } | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [floorOffset, setFloorOffset] = useState<number>(0)
 
   if (!playerRef.current) playerRef.current = new MotionPlayer()
   // Load profile when it changes
@@ -72,14 +75,14 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 10, 5]} intensity={0.8} />
 
-        {/* Ground plane and contact shadow for spatial context */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="#2b2b2b" metalness={0} roughness={1} />
-        </mesh>
-        <ContactShadows position={[0, -0.01, 0]} opacity={0.5} width={10} height={10} blur={2.5} far={5} />
-        {builtUrdf ? (
-          <RobotModel
+        {/* Floor removed per request to avoid overlap; environment lighting retained */}
+        {heroUrl ? (
+          <GroundSnap>
+            <HeroModel url={heroUrl} />
+          </GroundSnap>
+        ) : builtUrdf ? (
+          <GroundSnap onFloorChange={(y)=>setFloorOffset(y)}>
+            <RobotModel
             urdf={builtUrdf}
             showAxes={showAxes}
             onLoaded={(api) => {
@@ -91,10 +94,12 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
               setErrorMsg(msg)
               onError?.(e)
             }}
-          />
+              onBounds={(minY)=> setFloorOffset(minY)}
+            />
+          </GroundSnap>
         ) : null}
       {/* Minimal deterministic player loop */}
-      {profile ? (
+      {profile && !heroUrl ? (
         <AnimationTicker onTick={(delta) => {
           const player = playerRef.current
           const api = robotApiRef.current
@@ -112,6 +117,44 @@ export function Scene3D({ spec, urdf, assetBaseUrl, showAxes = false, onRobotApi
       </Canvas>
     </>
   )
+}
+
+function HeroModel({ url, scale = 1 }: { url: string; scale?: number }) {
+  const gltf = useGLTF(url)
+  useEffect(() => {
+    const scene = gltf.scene
+    // Ensure world matrices are current
+    scene.updateMatrixWorld(true)
+    // Auto-scale to a reasonable height and place on ground (y=0)
+    const box = new Box3().setFromObject(scene)
+    const size = new Vector3()
+    box.getSize(size)
+    const currentHeight = size.y || 1
+    const targetHeight = 2.0 // meters
+    const s = Math.min(scale, targetHeight / currentHeight)
+    scene.scale.setScalar(s)
+    // Recompute bounds after scaling, then lift so min.y = 0
+    scene.updateMatrixWorld(true)
+    const scaledBox = new Box3().setFromObject(scene)
+    const minY = scaledBox.min.y
+    scene.position.y += -minY + 0.02 // small epsilon to avoid z-fighting with ground
+  }, [gltf, scale])
+  return <primitive object={gltf.scene} />
+}
+
+function GroundSnap({ children, onFloorChange }: { children: React.ReactNode; onFloorChange?: (y:number)=>void }) {
+  const group = useRef<Group>(null)
+  useEffect(() => {
+    if (!group.current) return
+    // compute bounds of child content and lift to y=0
+    const box = new Box3().setFromObject(group.current)
+    const minY = box.min.y
+    if (Number.isFinite(minY) && minY !== 0) {
+      group.current.position.y += -minY + 0.02
+      onFloorChange?.(minY)
+    }
+  }, [children])
+  return <group ref={group}>{children}</group>
 }
 
 function AnimationTicker({ onTick }: { onTick: (deltaSeconds: number) => void }) {

@@ -3,6 +3,7 @@ import { Group, Mesh, MeshBasicMaterial, BoxGeometry } from 'three'
 import { useThree } from '@react-three/fiber'
 import URDFLoader from 'urdf-loader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 type JointMeta = { name: string; limit?: { lower: number; upper: number } }
 
@@ -13,10 +14,11 @@ type RobotApi = {
   listJoints: () => JointMeta[]
 }
 
-export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
+export function RobotModel({ urdf, onLoaded, onError, onBounds, showAxes = false }: {
   urdf: string | URL
   onLoaded?: (api: RobotApi) => void
   onError?: (error: Error | string) => void
+  onBounds?: (minY: number) => void
   showAxes?: boolean
 }) {
   const groupRef = useRef<Group>(null)
@@ -31,6 +33,17 @@ export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
       manager: any,
       onComplete: (obj: any) => void,
     ) => {
+      const lower = path.toLowerCase()
+      if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
+        const gltfLoader = new GLTFLoader(manager as any)
+        gltfLoader.load(
+          path,
+          (gltf) => onComplete(gltf.scene || new Group()),
+          undefined,
+          () => onComplete(new Group()),
+        )
+        return
+      }
       const objLoader = new OBJLoader(manager as any)
       objLoader.load(
         path,
@@ -89,6 +102,11 @@ export function RobotModel({ urdf, onLoaded, onError, showAxes = false }: {
       groupRef.current.add(robot)
       // Notify once when robot is first added
       onLoaded?.(api)
+      // Compute bounds and report to parent
+      try {
+        const box = new (require('three').Box3)().setFromObject(groupRef.current)
+        if (box && isFinite(box.min.y)) onBounds?.(box.min.y)
+      } catch {}
     }
     return () => {
       if (robot && groupRef.current) {

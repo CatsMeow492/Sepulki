@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { StaticModel } from '@/components'
 
 const Scene3D = dynamic(
   () => import('@/components/Scene3D').then((mod) => mod.Scene3D),
@@ -26,6 +27,9 @@ export default function QuotePage() {
         <div className="space-y-8">
           {/* 3D Preview */}
           <div className="bg-gray-100 rounded-lg p-4 aspect-square">
+            {/* Example: to preview a full robot GLB (Unitree or full industrial arm),
+                place under /robots/external and replace url below. */}
+            {/* <StaticModel url="/robots/external/unitree.glb" scale={1} /> */}
             <Scene3D urdf={builtUrdf} assetBaseUrl="/robots/sample-arm-01" />
           </div>
 

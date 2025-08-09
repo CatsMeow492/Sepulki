@@ -3,8 +3,11 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { SuggestedComponents } from './SuggestedComponents'
 import type { RobotSpec } from '@/types/robot';
-import { JointControls } from '@/components';
+import { JointControls, StaticModel } from '@/components';
+import { suggestPresetFromAnalysis } from '@/lib/presets';
+import { fetchCatalog, selectFromCatalog } from '@/lib/catalog';
 
 // Dynamically import the Scene3D component with SSR disabled
 const Scene3D = dynamic(
@@ -51,6 +54,7 @@ function ConfigureContent() {
   const [urdfText, setUrdfText] = useState<string>('');
   const [builtSpec, setBuiltSpec] = useState<RobotSpec | undefined>(undefined);
   const [builtUrdf, setBuiltUrdf] = useState<string | undefined>(undefined);
+  const [preset, setPreset] = useState<string>('sample-arm')
   const [jointSnapshot, setJointSnapshot] = useState<{ name: string; value: number; min?: number; max?: number }[]>([]);
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
@@ -89,9 +93,30 @@ function ConfigureContent() {
 
   // Auto-load a sample model once analysis is present (MVP: AI-prepopulated view)
   useEffect(() => {
-    if (analysis && !builtUrdf && !builtSpec) {
-      loadSample()
+    const init = async () => {
+      if (analysis && !builtUrdf && !builtSpec) {
+        const p = suggestPresetFromAnalysis(userInput, analysis)
+        setPreset(p)
+        const catalog = await fetchCatalog()
+        const choice = selectFromCatalog(catalog, p as any)
+        if (choice.heroCandidates && choice.heroCandidates.length > 0) {
+          // Render hero GLB statically
+          setBuiltUrdf(undefined)
+          setSourceTab('urdf')
+          setUrdfText('')
+          // store hero URL in a data attribute for future use if needed
+          ;(window as any).__heroUrl = choice.heroCandidates[0]
+        } else if (choice.urdf) {
+          setBuiltUrdf(choice.urdf)
+          setBuiltSpec(undefined)
+          setUrdfText(choice.urdf)
+          setSourceTab('urdf')
+        } else {
+          loadSample()
+        }
+      }
     }
+    init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysis])
 
@@ -219,44 +244,25 @@ function ConfigureContent() {
             </div>
           </div>
 
-          {/* Suggested Components */}
+          {/* Suggested Components (catalog-driven) */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Suggested Components</h2>
-            <div className="space-y-4">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    🤖
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">RT-2000 Arm</h3>
-                  <p className="text-sm text-gray-500">High precision, medium payload</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    🎮
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">Smart Controller X1</h3>
-                  <p className="text-sm text-gray-500">Advanced path planning</p>
-                </div>
-              </div>
-            </div>
+            <SuggestedComponents analysis={analysis} userInput={userInput} />
           </div>
         </div>
 
         {/* Right Column - 3D Visualization */}
         <div className="bg-gray-50 rounded-lg p-6">
           <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden relative">
-            <Scene3D
-              spec={builtSpec}
-              urdf={builtUrdf}
-              assetBaseUrl="/robots/sample-arm-01"
-              profile={builtSpec ? {
+            {preset === 'unitree-dog' && (window as any).__heroUrl ? (
+              // Static GLB hero preview
+              <Scene3D heroUrl={(window as any).__heroUrl as string} />
+            ) : (
+              <Scene3D
+                spec={builtSpec}
+                urdf={builtUrdf}
+                assetBaseUrl="/robots/sample-arm-01"
+                profile={builtSpec ? {
                 name: 'demo',
                 duration: 4,
                 loop: true,
@@ -266,10 +272,10 @@ function ConfigureContent() {
                   { t: 4, pose: { joint1: 0, joint2: 0 } },
                 ]
               } : undefined}
-              playing={playing}
-              playbackRate={rate}
-              seekTime={seek}
-              onRobotApi={(api) => {
+                playing={playing}
+                playbackRate={rate}
+                seekTime={seek}
+                onRobotApi={(api) => {
                 robotApiRef.current = api
                 const joints = api.listJoints()
                 const snapshot = joints.map((j) => ({
@@ -279,8 +285,9 @@ function ConfigureContent() {
                   max: j.limit?.upper,
                 }))
                 setJointSnapshot(snapshot)
-              }}
-            />
+                }}
+              />
+            )}
           </div>
           {/* Source selector + inputs */}
           <div className="mt-4">
