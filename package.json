@@ -1,5 +1,20 @@
 {
-  "dependencies": {
+  "name": "artifex",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "dev": "npm --workspace @artifex/web run dev",
+    "build": "npm --workspace @artifex/web run build",
+    "start": "npm --workspace @artifex/web run start",
+    "lint": "npm --workspace @artifex/web run lint"
+  },
+  "devDependencies": {
     "@mermaid-js/mermaid-cli": "^10.6.1",
     "mmdc": "^0.0.1"
   }
