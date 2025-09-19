@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: sepulki
+      POSTGRES_USER: smith
+      POSTGRES_PASSWORD: forge_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  influxdb:
+    image: influxdb:2.6
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: smith
+      DOCKER_INFLUXDB_INIT_PASSWORD: bellows_dev
+      DOCKER_INFLUXDB_INIT_ORG: sepulki
+      DOCKER_INFLUXDB_INIT_BUCKET: bellows
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: sepulki
+      MINIO_ROOT_PASSWORD: vault_dev_key
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    volumes:
+      - minio_data:/data
+
+  # Core Services
+  hammer-orchestrator:
+    build: 
+      context: .
+      dockerfile: services/hammer-orchestrator/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      REDIS_URL: redis://redis:6379
+      GRAPHQL_PLAYGROUND: true
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/hammer-orchestrator:/app
+      - /app/node_modules
+    command: npm run dev
+
+  foundry-pipeline:
+    build:
+      context: .
+      dockerfile: services/foundry-pipeline/Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: sepulki
+      MINIO_SECRET_KEY: vault_dev_key
+    depends_on:
+      - postgres
+      - minio
+    volumes:
+      - ./services/foundry-pipeline:/app
+      - /app/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: npm run dev
+
+  vault-registry:
+    build:
+      context: .
+      dockerfile: services/vault-registry/Dockerfile
+    ports:
+      - "4002:4002"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: sepulki
+      MINIO_SECRET_KEY: vault_dev_key
+    depends_on:
+      - postgres
+      - minio
+    volumes:
+      - ./services/vault-registry:/app
+      - /app/node_modules
+    command: npm run dev
+
+  bellows-telemetry:
+    build:
+      context: .
+      dockerfile: services/bellows-telemetry/Dockerfile
+    ports:
+      - "4003:4003"
+    environment:
+      NODE_ENV: development
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: dev_token
+      INFLUXDB_ORG: sepulki
+      INFLUXDB_BUCKET: bellows
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - influxdb
+      - redis
+    volumes:
+      - ./services/bellows-telemetry:/app
+      - /app/node_modules
+    command: npm run dev
+
+  tongs-policy:
+    build:
+      context: .
+      dockerfile: services/tongs-policy/Dockerfile
+    ports:
+      - "4004:4004"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/tongs-policy:/app
+      - /app/node_modules
+    command: npm run dev
+
+  choreo-dispatch:
+    build:
+      context: .
+      dockerfile: services/choreo-dispatch/Dockerfile
+    ports:
+      - "4005:4005"
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/choreo-dispatch:/app
+    command: python src/main.py
+
+  # Frontend
+  forge-ui:
+    build:
+      context: .
+      dockerfile: apps/forge-ui/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_GRAPHQL_ENDPOINT: http://localhost:4000/graphql
+      NEXT_PUBLIC_MINIO_ENDPOINT: http://localhost:9000
+    volumes:
+      - ./apps/forge-ui:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  influxdb_data:
+  redis_data:
+  minio_data:
+
+networks:
+  default:
+    name: sepulki_network

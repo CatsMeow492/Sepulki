@@ -1,0 +1,18 @@
+{
+  "name": "@sepulki/graphql-schema",
+  "version": "1.0.0",
+  "description": "Shared GraphQL schema definitions for the Sepulki platform",
+  "main": "schema.graphql",
+  "scripts": {
+    "validate": "graphql-schema-linter schema.graphql",
+    "build": "cp schema.graphql dist/schema.graphql"
+  },
+  "keywords": ["sepulki", "robotics", "graphql", "schema"],
+  "devDependencies": {
+    "graphql-schema-linter": "^3.0.0"
+  },
+  "files": [
+    "schema.graphql",
+    "dist/**/*"
+  ]
+}

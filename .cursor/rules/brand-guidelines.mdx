@@ -1,0 +1,110 @@
+Brand pillars (words we keep using)
+	•	Sepulki — the company + ecosystem.
+	•	Forge — where robots are designed (frontend app).
+	•	Foundry — the build/compile pipeline from spec → deployable unit.
+	•	Anvil — simulation + validation surface (stress, collisions, latency).
+	•	Alloy — component library (hardware + software modules).
+	•	Pattern — reusable design template (parametric blueprint).
+	•	Temper — optimization/tuning pass (cost, speed, safety).
+	•	Quench — safe deploy step to production fleets.
+	•	Smith(s) — users who design (creators); Over-Smiths — admins.
+
+Core systems (product areas)
+	•	Forge (FE): design studio where Smiths assemble robots from Alloys using Patterns; runs Anvil sims; exports Ingots (signed builds).
+	•	Foundry (CI/CD): converts Ingots to containers/firmware bundles, assigns versions, runs Temper jobs, publishes to registries.
+	•	Orchestrator (BE): fleet brain (assigns tasks, load balancer, safety). If you want a name: Hammer.
+	•	Telemetry: time-series + logs pipeline called Bellows (it “feeds the fire”).
+	•	Registry: artifact & parts catalog called Vault.
+	•	Policy: constraints/safety engine called Tongs (they enforce what can be held/handled).
+	•	Dispatch: tasking & mission planner called Choreographer (or shorter: Choreo).
+
+Primary nouns (data model)
+	•	Sepulka — a full robot design (name nod to Lem). sepulka_id
+	•	Alloy — atomic component (motor, arm, skill, model). alloy_id, typed.
+	•	Pattern — parametric template (schema + defaults). pattern_id
+	•	Ingot — compiled build artifact (signed). ingot_id, semver.
+	•	Locus — a physical site/zone. locus_id
+	•	Fleet — group of robots under common constraints. fleet_id
+	•	Task — unit of requested work. task_id
+	•	Run — execution of a task by a robot. run_id
+	•	Bellows — telemetry stream/event. event_id
+	•	Edict — policy rule (safety, compliance, SLA). edict_id
+
+Primary verbs (APIs & UI actions)
+	•	Forge (create/assemble), Cast (compile), Temper (optimize), Quench (deploy), Recall (roll back), Anneal (adapt/learn), Inspect (audit), Stamp (sign), Test (simulate), Dispatch (assign).
+
+Service map & example repo names
+	•	forge-ui (Next.js/React app)
+	•	foundry-pipeline (build & sign)
+	•	anvil-sim (physics/scene simulation)
+	•	hammer-orchestrator (assignments/HA control plane)
+	•	bellows-telemetry (ingest/TSDB exporters)
+	•	vault-registry (artifacts/parts metadata)
+	•	tongs-policy (OPA-style policies + real-time guards)
+	•	choreo-dispatch (planner/route solver)
+	•	scribe-audit (immutable logs & attestations)
+
+API sketch (REST/GraphQL naming flavor)
+	•	POST /sepulkas → Forge a new design
+	•	POST /sepulkas/{id}/cast → Produce an Ingot
+	•	POST /ingots/{id}/temper → Optimize build
+	•	POST /ingots/{id}/quench → Deploy to Fleet
+	•	POST /fleets/{id}/dispatch → Assign Task
+	•	POST /runs/{id}/recall → Safe rollback
+	•	GET /bellows?sepulka_id=… → Telemetry filter
+	•	POST /edicts → Add/update policy
+
+GraphQL example:
+
+mutation ForgeSepulka($input: ForgeInput!) { forgeSepulka(input: $input) { sepulkaId, version, status } }
+
+Events & metrics (PostHog/Segment naming)
+	•	Forge.Opened
+	•	Forge.PatternApplied
+	•	Alloy.DroppedIntoCanvas
+	•	Anvil.SimStarted
+	•	Anvil.SimFailed (props: reason)
+	•	Ingot.CastCompleted (size_mb, build_time_ms)
+	•	Temper.Completed (cost_delta, latency_delta)
+	•	Quench.Deployed (fleet_id, rollout_pct)
+	•	Choreo.TaskAssigned (policy_route, confidence)
+	•	Bellows.HealthScore (score, battery, temp, rssi)
+	•	Tongs.PolicyBreach (severity, edict_id)
+
+Key SLOs:
+	•	Forge TTI (p95 ms), Cast time (p95), Dispatch latency (p95), Task success rate, MTTD/MTTR, Policy breach rate, Safety incident = 0.
+
+Environments
+	•	Crucible (dev sandbox), Kiln (staging), Bloom (pre-prod soak), Field (prod).
+
+UX copy tone (samples)
+	•	Empty state (Forge): “Drop Alloys to begin forging your Sepulka.”
+	•	Sim pass: “Anvil: Temperatures nominal. Cast is ready.”
+	•	Deploy: “Quench to Field (25% canary) — guarded by Tongs.”
+
+CLI (developer ergonomics)
+	•	sepulki forge --pattern pick_and_place --alloys arm=v3,gripper=v2
+	•	sepulki cast --sepulka 9f2a --sign --out ./dist
+	•	sepulki temper --ingot 9f2a@1.3.0 --goal 'latency<120ms,cost-10%'
+	•	sepulki quench --ingot 9f2a@1.3.0 --fleet ares --canary 10
+	•	sepulki recall --fleet ares --to 1.2.4
+
+Data & topics (Kafka/TSDB)
+	•	bellows.telemetry.<fleet>.<robot_id>
+	•	hammer.assignments.decisions
+	•	tongs.policy.breaches
+	•	foundry.builds.status
+	•	TSDB measurement names: run_metrics, motor_current, battery_soc, pose_error, task_latency.
+
+Tables (short names)
+	•	sepulkas, alloys, patterns, ingots, fleets, edicts, tasks, runs, telemetry_events, audit_stamps.
+
+Security & compliance (names)
+	•	Stamp = signing/attestation bundle
+	•	Seal = deployment gate approval
+	•	Warden = runtime guard (killswitch + geo/safety fences)
+
+Visual language (Forge UI)
+	•	Canvas = Hearth; sidebars = Bins (Alloys), Patterns (templates), Bellows (live metrics panel).
+	•	States: Glowing (ready), Cooling (post-cast), Brittle (policy-at-risk), True (validated).
+

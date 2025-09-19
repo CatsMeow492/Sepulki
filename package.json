@@ -1,21 +1,58 @@
 {
-  "name": "artifex",
+  "name": "sepulki",
+  "version": "1.0.0",
+  "description": "Robotics-as-a-Service platform with metallurgy-themed branding",
   "private": true,
   "workspaces": [
     "apps/*",
+    "services/*", 
     "packages/*"
   ],
   "engines": {
     "node": ">=18.18.0"
   },
   "scripts": {
-    "dev": "npm --workspace @artifex/web run dev",
-    "build": "npm --workspace @artifex/web run build",
-    "start": "npm --workspace @artifex/web run start",
-    "lint": "npm --workspace @artifex/web run lint"
+    "dev": "concurrently \"npm run dev:hammer\" \"npm run dev:forge\"",
+    "dev:forge": "npm --workspace @sepulki/forge-ui run dev",
+    "dev:hammer": "npm --workspace @sepulki/hammer-orchestrator run dev",
+    "build": "npm run build:packages && npm run build:services && npm run build:apps",
+    "build:packages": "npm run build --workspaces --if-present",
+    "build:services": "npm run build --workspace @sepulki/hammer-orchestrator",
+    "build:apps": "npm run build --workspace @sepulki/forge-ui", 
+    "start": "npm run start:services",
+    "start:services": "concurrently \"npm run start --workspace @sepulki/hammer-orchestrator\"",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace @sepulki/forge-ui",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "npm run migrate --workspace @sepulki/hammer-orchestrator",
+    "db:seed": "npm run seed --workspace @sepulki/hammer-orchestrator",
+    "migrate": "./scripts/migrate-to-sepulki.sh",
+    "clean": "npm run clean --workspaces --if-present",
+    "reset": "npm run clean && rm -rf node_modules && npm install"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^10.6.1",
+    "concurrently": "^8.2.0",
     "mmdc": "^0.0.1"
-  }
+  },
+  "keywords": [
+    "robotics",
+    "automation", 
+    "ras",
+    "robotics-as-a-service",
+    "manufacturing",
+    "ai",
+    "3d",
+    "isaac-sim",
+    "graphql"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CatsMeow492/Sepulki.git"
+  },
+  "author": "Sepulki Team",
+  "license": "MIT"
 }

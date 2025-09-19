@@ -1,0 +1,54 @@
+# Isaac Sim Integration Dependencies
+# Note: These should be installed in Isaac Sim's Python environment
+
+# gRPC and Protocol Buffers
+grpcio==1.60.0
+grpcio-tools==1.60.0
+protobuf==4.25.1
+
+# WebSocket server
+websockets==12.0
+tornado==6.4
+
+# Async support
+asyncio-glib==0.1
+aiofiles==23.2.1
+
+# Data processing
+numpy==1.24.3
+scipy==1.11.4
+
+# Geometry and mathematics
+transforms3d==0.4.1
+quaternion==2022.4.2
+
+# Configuration and utilities
+pydantic==2.5.2
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# Logging and monitoring
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# Redis client for caching
+redis==5.0.1
+
+# Database connectivity
+asyncpg==0.29.0
+
+# HTTP client for API calls
+aiohttp==3.9.1
+
+# Image processing for video streams
+pillow==10.1.0
+opencv-python==4.8.1.78
+
+# Performance profiling
+py-spy==0.3.14
+
+# Development dependencies (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+mypy==1.7.1

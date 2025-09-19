@@ -1,0 +1,356 @@
+# Sepulki GraphQL Schema
+# Metallurgy-themed robotics-as-a-service platform
+
+scalar JSON
+scalar DateTime
+scalar Upload
+
+# Core Types
+type Sepulka {
+  id: ID!
+  name: String!
+  version: String!
+  description: String
+  pattern: Pattern
+  alloys: [Alloy!]!
+  ingots: [Ingot!]!
+  status: SepulkaStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: Smith!
+}
+
+type Alloy {
+  id: ID!
+  name: String!
+  description: String
+  type: AlloyType!
+  specifications: JSON
+  meshAssets: [String!]
+  urdfTemplate: String
+  compatibility: [AlloyCompatibility!]
+  tags: [String!]
+  version: String!
+  createdAt: DateTime!
+}
+
+type Pattern {
+  id: ID!
+  name: String!
+  description: String
+  parameters: JSON
+  defaults: JSON
+  template: String
+  category: PatternCategory!
+  tags: [String!]
+  createdAt: DateTime!
+}
+
+type Ingot {
+  id: ID!
+  sepulkaId: ID!
+  version: String!
+  buildHash: String!
+  artifacts: [BuildArtifact!]!
+  status: IngotStatus!
+  buildLogs: [String!]
+  createdAt: DateTime!
+  tempered: Boolean!
+  temperResults: TemperResults
+}
+
+type Fleet {
+  id: ID!
+  name: String!
+  description: String
+  locus: Locus!
+  robots: [Robot!]!
+  activeTask: Task
+  status: FleetStatus!
+  constraints: [Edict!]
+  telemetry: BellowsStream
+  createdAt: DateTime!
+}
+
+type Robot {
+  id: ID!
+  name: String!
+  sepulkaId: ID!
+  fleetId: ID!
+  currentIngot: Ingot!
+  status: RobotStatus!
+  lastSeen: DateTime
+  pose: RobotPose
+  batteryLevel: Float
+  healthScore: Float
+}
+
+type Task {
+  id: ID!
+  name: String!
+  description: String
+  type: TaskType!
+  parameters: JSON
+  assignedRobots: [Robot!]
+  runs: [Run!]!
+  status: TaskStatus!
+  priority: TaskPriority!
+  scheduledAt: DateTime
+  createdAt: DateTime!
+  createdBy: Smith!
+}
+
+type Run {
+  id: ID!
+  taskId: ID!
+  robotId: ID!
+  status: RunStatus!
+  startedAt: DateTime
+  completedAt: DateTime
+  metrics: RunMetrics
+  logs: [String!]
+}
+
+type Locus {
+  id: ID!
+  name: String!
+  description: String
+  coordinates: Coordinates
+  constraints: [Edict!]
+  safetyZones: [SafetyZone!]
+}
+
+type Smith {
+  id: ID!
+  email: String!
+  name: String!
+  role: SmithRole!
+  permissions: [Permission!]!
+  createdAt: DateTime!
+}
+
+type BellowsStream {
+  fleetId: ID!
+  metrics: [TelemetryMetric!]!
+  events: [TelemetryEvent!]!
+  realTime: Boolean!
+}
+
+type Edict {
+  id: ID!
+  name: String!
+  description: String
+  type: EdictType!
+  rules: JSON
+  severity: EdictSeverity!
+  active: Boolean!
+}
+
+# Enums
+enum SepulkaStatus {
+  FORGING
+  CAST_READY
+  CASTING
+  CAST_FAILED
+  READY
+}
+
+enum AlloyType {
+  ACTUATOR
+  SENSOR
+  CONTROLLER
+  END_EFFECTOR
+  CHASSIS
+  POWER
+  COMMUNICATION
+}
+
+enum IngotStatus {
+  BUILDING
+  BUILD_FAILED
+  READY
+  TEMPERING
+  TEMPER_FAILED
+  TEMPERED
+  DEPLOYED
+}
+
+enum FleetStatus {
+  IDLE
+  ACTIVE
+  MAINTENANCE
+  ERROR
+  OFFLINE
+}
+
+enum RobotStatus {
+  IDLE
+  WORKING
+  CHARGING
+  MAINTENANCE
+  ERROR
+  OFFLINE
+}
+
+enum TaskStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SmithRole {
+  SMITH
+  OVER_SMITH
+  ADMIN
+}
+
+enum EdictType {
+  SAFETY
+  PERFORMANCE
+  COMPLIANCE
+  OPERATIONAL
+}
+
+enum EdictSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+# Input Types
+input ForgeInput {
+  name: String!
+  description: String
+  patternId: ID
+  alloyIds: [ID!]!
+  parameters: JSON
+}
+
+input TaskInput {
+  name: String!
+  description: String
+  type: TaskType!
+  parameters: JSON
+  priority: TaskPriority = NORMAL
+  scheduledAt: DateTime
+}
+
+input TemperInput {
+  goals: [TemperGoal!]!
+  constraints: JSON
+}
+
+input TemperGoal {
+  metric: String!
+  target: String!
+  weight: Float = 1.0
+}
+
+# Mutation Payloads
+type ForgeSepulkaPayload {
+  sepulka: Sepulka
+  errors: [Error!]
+}
+
+type CastIngotPayload {
+  ingot: Ingot
+  errors: [Error!]
+}
+
+type TemperIngotPayload {
+  ingot: Ingot
+  results: TemperResults
+  errors: [Error!]
+}
+
+type QuenchPayload {
+  deployment: Deployment
+  errors: [Error!]
+}
+
+type DispatchPayload {
+  task: Task
+  assignments: [TaskAssignment!]
+  errors: [Error!]
+}
+
+# Queries
+type Query {
+  # Sepulkas
+  sepulkas(filter: SepulkaFilter, limit: Int, offset: Int): [Sepulka!]!
+  sepulka(id: ID!): Sepulka
+  
+  # Catalog
+  alloys(filter: AlloyFilter, limit: Int, offset: Int): [Alloy!]!
+  alloy(id: ID!): Alloy
+  patterns(category: PatternCategory, limit: Int, offset: Int): [Pattern!]!
+  pattern(id: ID!): Pattern
+  
+  # Fleet Management
+  fleets(filter: FleetFilter, limit: Int, offset: Int): [Fleet!]!
+  fleet(id: ID!): Fleet
+  robots(fleetId: ID, status: RobotStatus, limit: Int, offset: Int): [Robot!]!
+  robot(id: ID!): Robot
+  
+  # Task Management
+  tasks(filter: TaskFilter, limit: Int, offset: Int): [Task!]!
+  task(id: ID!): Task
+  runs(taskId: ID, robotId: ID, limit: Int, offset: Int): [Run!]!
+  
+  # Telemetry
+  bellows(fleetId: ID!, timeRange: TimeRange!): BellowsStream!
+  
+  # Policy
+  edicts(type: EdictType, active: Boolean, limit: Int, offset: Int): [Edict!]!
+}
+
+# Mutations
+type Mutation {
+  # Design & Build
+  forgeSepulka(input: ForgeInput!): ForgeSepulkaPayload!
+  castIngot(sepulkaId: ID!): CastIngotPayload!
+  temperIngot(ingotId: ID!, input: TemperInput!): TemperIngotPayload!
+  
+  # Deployment
+  quenchToFleet(ingotId: ID!, fleetId: ID!, rolloutPercent: Int = 100): QuenchPayload!
+  recallFleet(fleetId: ID!, toVersion: String!): QuenchPayload!
+  
+  # Task Management
+  dispatchTask(fleetId: ID!, input: TaskInput!): DispatchPayload!
+  cancelTask(taskId: ID!): Task
+  
+  # Fleet Management
+  updateRobotStatus(robotId: ID!, status: RobotStatus!): Robot
+  emergencyStop(fleetId: ID!): Fleet
+  
+  # Policy
+  addEdict(input: EdictInput!): Edict
+  updateEdict(id: ID!, input: EdictInput!): Edict
+  deactivateEdict(id: ID!): Edict
+}
+
+# Subscriptions
+type Subscription {
+  bellowsStream(fleetId: ID!): BellowsStream!
+  taskUpdates(fleetId: ID): Task!
+  robotStatus(robotId: ID): Robot!
+  policyBreaches(severity: EdictSeverity): PolicyBreach!
+}
