@@ -14,7 +14,13 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "dev": "./scripts/dev-tools.sh start",
+    "dev": "npm run start:simple",
+    "start:simple": "echo '🔥 Starting Sepulki development environment...' && npm run dev:infra && sleep 3 && npm run dev:services",
+    "dev:infra": "docker-compose up -d postgres redis minio influxdb && echo '✅ Infrastructure ready'",
+    "dev:services": "concurrently --names 'BACKEND,FRONTEND' --prefix-colors 'blue,green' 'npm run dev:backend' 'npm run dev:frontend'",
+    "dev:backend": "cd services/hammer-orchestrator && DATABASE_URL=postgresql://smith:forge_dev@localhost:5432/sepulki REDIS_URL=redis://localhost:6379 npm run dev",
+    "dev:frontend": "cd apps/forge-ui && npm run dev",
+    "dev:full": "./scripts/dev-tools.sh start",
     "dev:forge": "npm --workspace @sepulki/forge-ui run dev",
     "dev:hammer": "npm --workspace @sepulki/hammer-orchestrator run dev",
     "stop": "./scripts/dev-tools.sh stop",

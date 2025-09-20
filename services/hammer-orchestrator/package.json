@@ -9,8 +9,13 @@
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:tdd": "jest --watch --verbose",
+    "test:ci": "jest --ci --coverage --watchAll=false",
     "lint": "eslint src --ext .ts",
-    "schema": "graphql-codegen --config codegen.yml"
+    "lint:fix": "eslint src --ext .ts --fix",
+    "schema": "graphql-codegen --config codegen.yml",
+    "db:test": "NODE_ENV=test npm run test"
   },
   "dependencies": {
     "@apollo/server": "^4.9.0",

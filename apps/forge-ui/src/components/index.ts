@@ -5,3 +5,4 @@ export { Scene3D } from './Scene3D';
 export { StaticModel } from './StaticModel';
 export { AuthProvider } from './AuthProvider';
 export { SmithProfile } from './SmithProfile';
+export { SaveDesignModal } from './SaveDesignModal';

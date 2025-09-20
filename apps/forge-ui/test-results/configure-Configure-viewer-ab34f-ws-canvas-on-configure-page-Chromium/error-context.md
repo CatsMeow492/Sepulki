@@ -2,15 +2,22 @@
 
 ```yaml
 - navigation:
-  - link "Artifex":
+  - link "🔥 Sepulki":
     - /url: /
-  - link "Configure Robot":
+  - link "Forge Robot":
     - /url: /configure
-  - link "Dashboard":
+  - link "My Designs":
+    - /url: /designs
+  - link "Fleet Dashboard":
     - /url: /dashboard
   - link "Pricing":
     - /url: /pricing
-  - button "Get Started"
+  - button "D ⚒️ Development Smith over smith":
+    - text: D
+    - paragraph: ⚒️ Development Smith
+    - paragraph: over smith
+  - link "Get Started":
+    - /url: /auth/signin
 - main:
   - text: 1 Use Case 2 Components 3 Review 4 Quote
   - heading "Design Your Perfect Automation Solution" [level=1]
@@ -27,6 +34,6 @@
     - text: Analyze Requirements
     - img
 - contentinfo:
-  - paragraph: © 2024 Artifex. All rights reserved.
+  - paragraph: © 2024 Sepulki. All rights reserved.
 - alert
 ```

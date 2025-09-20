@@ -46,10 +46,27 @@ async function startServer() {
         const authHeader = req.headers.authorization;
         const token = authHeader?.replace('Bearer ', '');
         
+        // For local development only, allow mock authentication
+        const isLocalDev = (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev') && 
+                          (process.env.DATABASE_URL?.includes('localhost') || process.env.DATABASE_URL?.includes('127.0.0.1'));
+        
+        if (isLocalDev && token && token.endsWith('.mock-signature-for-development')) {
+          console.log('🔧 Local development mode: Creating mock context for token');
+          return await createContext({ token });
+        }
+        
+        // For local development without auth, provide a basic context
+        if (isLocalDev && !token) {
+          console.log('🔧 Local development mode: Creating anonymous context');
+          return await createContext({});
+        }
+        
         try {
           return await createContext({ token });
         } catch (error) {
-          throw new AuthenticationError('Invalid authentication token');
+          // Log the actual error for debugging
+          console.error('Context creation error:', error);
+          throw new AuthenticationError(`Authentication failed: ${error instanceof Error ? error.message : error}`);
         }
       },
     }),

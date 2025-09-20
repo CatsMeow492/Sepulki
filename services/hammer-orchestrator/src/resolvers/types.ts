@@ -13,36 +13,40 @@ export interface Resolvers {
   JSON: any;
   
   Query: {
-    sepulkas: Resolver<any[]>;
-    sepulka: Resolver<any | null>;
-    alloys: Resolver<any[]>;
-    alloy: Resolver<any | null>;
-    patterns: Resolver<any[]>;
-    pattern: Resolver<any | null>;
-    fleets: Resolver<any[]>;
-    fleet: Resolver<any | null>;
-    robots: Resolver<any[]>;
-    robot: Resolver<any | null>;
-    tasks: Resolver<any[]>;
-    task: Resolver<any | null>;
-    runs: Resolver<any[]>;
-    bellows: Resolver<any>;
-    edicts: Resolver<any[]>;
+    sepulkas: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    sepulka: Resolver<any | null, any, { id: string }>;
+    alloys: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    alloy: Resolver<any | null, any, { id: string }>;
+    patterns: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    pattern: Resolver<any | null, any, { id: string }>;
+    fleets: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    fleet: Resolver<any | null, any, { id: string }>;
+    robots: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    robot: Resolver<any | null, any, { id: string }>;
+    tasks: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    task: Resolver<any | null, any, { id: string }>;
+    runs: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
+    bellows: Resolver<any, any, { fleetId?: string; timeRange?: any }>;
+    edicts: Resolver<any[], any, { filter?: any; limit?: number; offset?: number }>;
   };
   
   Mutation: {
-    forgeSepulka: Resolver<any>;
-    castIngot: Resolver<any>;
-    temperIngot: Resolver<any>;
-    quenchToFleet: Resolver<any>;
-    recallFleet: Resolver<any>;
-    dispatchTask: Resolver<any>;
-    cancelTask: Resolver<any>;
-    updateRobotStatus: Resolver<any>;
-    emergencyStop: Resolver<any>;
-    addEdict: Resolver<any>;
-    updateEdict: Resolver<any>;
-    deactivateEdict: Resolver<any>;
+    forgeSepulka: Resolver<any, any, { input: any }>;
+    deleteSepulka: Resolver<any, any, { id: string }>;
+    castIngot: Resolver<any, any, { sepulkaId: string }>;
+    temperIngot: Resolver<any, any, { ingotId: string; input: any }>;
+    quenchToFleet: Resolver<any, any, { ingotId: string; fleetId: string; rolloutPercent?: number }>;
+    recallFleet: Resolver<any, any, { fleetId: string; toVersion: string }>;
+    dispatchTask: Resolver<any, any, { input: any }>;
+    cancelTask: Resolver<any, any, { taskId: string }>;
+    updateRobotStatus: Resolver<any, any, { robotId: string; status: string }>;
+    emergencyStop: Resolver<any, any, { fleetId: string }>;
+    addEdict: Resolver<any, any, { input: any }>;
+    updateEdict: Resolver<any, any, { id: string; input: any }>;
+    deactivateEdict: Resolver<any, any, { id: string }>;
+    login: Resolver<any, any, { credentials: any }>;
+    refreshToken: Resolver<any, any, { refreshToken: string }>;
+    logout: Resolver<any, any, {}>;
   };
   
   Subscription: {
@@ -53,10 +57,19 @@ export interface Resolvers {
   };
   
   Sepulka: {
+    createdAt: Resolver<any>;
+    updatedAt: Resolver<any>;
     pattern: Resolver<any>;
     alloys: Resolver<any[]>;
     ingots: Resolver<any[]>;
     createdBy: Resolver<any>;
+  };
+  
+  Ingot: {
+    sepulkaId: Resolver<any>;
+    buildHash: Resolver<any>;
+    createdAt: Resolver<any>;
+    artifacts: Resolver<any[]>;
   };
   
   Alloy: any;

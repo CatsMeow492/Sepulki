@@ -10,10 +10,17 @@ const config = {
   transform: {
     '^.+\\.(ts|tsx)$': [
       'ts-jest',
-      { tsconfig: '<rootDir>/tsconfig.json', isolatedModules: true },
+      { 
+        tsconfig: '<rootDir>/tsconfig.json', 
+        isolatedModules: true,
+        jsx: 'react-jsx'
+      },
     ],
   },
   testMatch: ['<rootDir>/src/**/*.(test|spec).(ts|tsx)'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(.*\\.mjs$))'
+  ],
 }
 
 module.exports = config

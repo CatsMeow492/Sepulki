@@ -39,6 +39,12 @@ export default function RootLayout({
                         Forge Robot
                       </Link>
                       <Link
+                        href="/designs"
+                        className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
+                      >
+                        My Designs
+                      </Link>
+                      <Link
                         href="/dashboard"
                         className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
                       >

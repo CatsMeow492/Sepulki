@@ -8,6 +8,8 @@ import type { RobotSpec } from '@/types/robot';
 import { JointControls, StaticModel } from '@/components';
 import { suggestPresetFromAnalysis } from '@/lib/presets';
 import { fetchCatalog, selectFromCatalog } from '@/lib/catalog';
+import { SaveDesignModal } from '@/components/SaveDesignModal';
+import { useAuth } from '@/components/AuthProvider';
 
 // Dynamically import the Scene3D component with SSR disabled
 const Scene3D = dynamic(
@@ -46,6 +48,7 @@ const useCaseExamples = [
 function ConfigureContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { smith } = useAuth();
   const [currentStep, setCurrentStep] = useState<number>(2);
   const [analysis, setAnalysis] = useState<string>('');
   const [userInput, setUserInput] = useState<string>('');
@@ -59,6 +62,14 @@ function ConfigureContent() {
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [seek, setSeek] = useState<number | undefined>(undefined)
+
+  // Save design state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [selectedAlloys, setSelectedAlloys] = useState<string[]>([
+    'e604e430-70bd-4614-ba64-4c36c219621d', // ServoMax Pro 3000
+    'd86ab673-b375-4b46-823e-c198bc10b6f5'  // GripForce Elite
+  ]);
+  const [patternId, setPatternId] = useState<string>('3080083a-2de1-4200-bc5c-d92f6c459f05'); // Industrial Arm - 6DOF
   const robotApiRef = useRef<{
     getJoint: (name: string) => any
     setJointValue: (name: string, value: number) => void
@@ -350,20 +361,44 @@ function ConfigureContent() {
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex justify-end space-x-4 mt-8">
+      <div className="flex justify-between space-x-4 mt-8">
         <button
           onClick={() => router.push('/')}
           className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
         >
           Start Over
         </button>
-        <button
-          onClick={() => router.push('/review')}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Continue
-        </button>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 flex items-center"
+            disabled={!smith}
+          >
+            🔥 Save Design
+          </button>
+          <button
+            onClick={() => router.push('/review')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Continue to Review
+          </button>
+        </div>
       </div>
+
+      {/* Save Design Modal */}
+      <SaveDesignModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSaved={(sepulkaId) => {
+          console.log('✅ Design saved with ID:', sepulkaId);
+          // Navigate to My Designs page to show the new design
+          router.push(`/designs?newDesign=${sepulkaId}`);
+        }}
+        robotSpec={builtSpec}
+        selectedAlloys={selectedAlloys}
+        patternId={patternId}
+      />
     </div>
   );
 } 

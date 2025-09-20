@@ -478,6 +478,11 @@ type ForgeSepulkaPayload {
   errors: [Error!]
 }
 
+type DeleteSepulkaPayload {
+  success: Boolean!
+  errors: [Error!]
+}
+
 type CastIngotPayload {
   ingot: Ingot
   errors: [Error!]
@@ -539,6 +544,7 @@ type Mutation {
   
   # Design & Build
   forgeSepulka(input: ForgeInput!): ForgeSepulkaPayload!
+  deleteSepulka(id: ID!): DeleteSepulkaPayload!
   castIngot(sepulkaId: ID!): CastIngotPayload!
   temperIngot(ingotId: ID!, input: TemperInput!): TemperIngotPayload!
   

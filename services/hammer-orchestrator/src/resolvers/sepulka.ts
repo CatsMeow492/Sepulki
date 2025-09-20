@@ -65,109 +65,226 @@ export const sepulkaResolvers = {
       }
 
       try {
-        // Start transaction
-        const client = await context.db.connect();
-        await client.query('BEGIN');
+        // Use direct queries with automatic transaction handling
+        const sepulkaResult = await context.db.query(`
+          INSERT INTO sepulkas (name, description, pattern_id, status, created_by, parameters)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *
+        `, [
+          name,
+          description,
+          patternId,
+          'FORGING',
+          smith.id,
+          parameters || {}
+        ]);
 
-        try {
-          // Create sepulka
-          const sepulkaQuery = `
-            INSERT INTO sepulkas (name, description, pattern_id, status, created_by, parameters)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
-          `;
-          const sepulkaResult = await client.query(sepulkaQuery, [
-            name,
-            description,
-            patternId,
-            'FORGING',
-            smith.id,
-            parameters || {}
-          ]);
+        const sepulka = sepulkaResult.rows[0];
 
-          const sepulka = sepulkaResult.rows[0];
-
-          // Associate alloys
-          for (const alloyId of alloyIds) {
-            await client.query(
-              'INSERT INTO sepulka_alloys (sepulka_id, alloy_id) VALUES ($1, $2)',
-              [sepulka.id, alloyId]
-            );
-          }
-
-          await client.query('COMMIT');
-          client.release();
-
-          // Clear cache
-          context.dataloaders.sepulka.clear(sepulka.id);
-
-          return {
-            sepulka,
-            errors: []
-          };
-        } catch (error) {
-          await client.query('ROLLBACK');
-          client.release();
-          throw error;
+        // Associate alloys
+        for (const alloyId of alloyIds) {
+          await context.db.query(
+            'INSERT INTO sepulka_alloys (sepulka_id, alloy_id) VALUES ($1, $2)',
+            [sepulka.id, alloyId]
+          );
         }
+
+        // Clear cache (if dataloaders exist)
+        if (context.dataloaders?.sepulka?.clear) {
+          context.dataloaders.sepulka.clear(sepulka.id);
+        }
+
+        return {
+          sepulka,
+          errors: []
+        };
       } catch (error) {
         throw new ServiceError('database', `Failed to forge sepulka: ${error}`);
       }
     },
 
     async castIngot(parent: any, { sepulkaId }: { sepulkaId: string }, context: Context) {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(sepulkaId)) {
+        throw new ValidationError('Invalid UUID format');
+      }
+
       const { smith } = await requirePermission(context, Permission.CAST_INGOT);
 
-      // Verify sepulka exists and is ready
-      const sepulka = await context.dataloaders.sepulka.load(sepulkaId);
-      if (!sepulka) {
-        throw new NotFoundError('Sepulka', sepulkaId);
-      }
-
-      if (sepulka.status !== 'CAST_READY') {
-        throw new ValidationError(`Sepulka must be in CAST_READY status, currently: ${sepulka.status}`);
-      }
-
       try {
-        // Update sepulka status
+        // Verify sepulka exists and load with alloys
+        const sepulkaQuery = await context.db.query(`
+          SELECT s.*, COUNT(sa.alloy_id) as alloy_count
+          FROM sepulkas s
+          LEFT JOIN sepulka_alloys sa ON s.id = sa.sepulka_id
+          WHERE s.id = $1
+          GROUP BY s.id, s.name, s.description, s.status, s.pattern_id, s.parameters, s.created_by, s.created_at, s.updated_at, s.version
+        `, [sepulkaId]);
+
+        if (sepulkaQuery.rows.length === 0) {
+          throw new NotFoundError('Sepulka', sepulkaId);
+        }
+
+        const sepulka = sepulkaQuery.rows[0];
+
+        // Validate sepulka status
+        if (sepulka.status !== 'CAST_READY') {
+          throw new ValidationError(`Sepulka must be in CAST_READY status, currently: ${sepulka.status}`);
+        }
+
+        // Validate sepulka completeness - must have alloys
+        if (parseInt(sepulka.alloy_count) === 0) {
+          throw new ValidationError('Sepulka is incomplete');
+        }
+
+        // Check for existing ingots to determine version
+        const existingIngotsQuery = await context.db.query(
+          'SELECT COUNT(*) as ingot_count FROM ingots WHERE sepulka_id = $1',
+          [sepulkaId]
+        );
+        const ingotCount = parseInt(existingIngotsQuery.rows[0].ingot_count);
+        const patchVersion = ingotCount; // 1.0.0, 1.0.1, 1.0.2, etc.
+        const version = `1.0.${patchVersion}`;
+
+        // Update sepulka status to CASTING
         await context.db.query(
           'UPDATE sepulkas SET status = $1, updated_at = NOW() WHERE id = $2',
           ['CASTING', sepulkaId]
         );
 
-        // Create ingot record
-        const ingotQuery = `
-          INSERT INTO ingots (sepulka_id, status, build_hash, created_by)
-          VALUES ($1, $2, $3, $4)
+        // Create ingot record with version
+        const buildHash = `build_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const ingotResult = await context.db.query(`
+          INSERT INTO ingots (sepulka_id, version, status, build_hash, created_by)
+          VALUES ($1, $2, $3, $4, $5)
           RETURNING *
-        `;
-        const buildHash = `build_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const ingotResult = await context.db.query(ingotQuery, [
-          sepulkaId,
-          'BUILDING',
-          buildHash,
-          smith.id
-        ]);
+        `, [sepulkaId, version, 'BUILDING', buildHash, smith.id]);
 
         const ingot = ingotResult.rows[0];
 
-        // Trigger foundry build process (async)
-        await context.redis.publish('foundry:build', JSON.stringify({
-          ingotId: ingot.id,
-          sepulkaId: sepulkaId,
-          buildHash: buildHash,
-          requestedBy: smith.id
-        }));
+        // Create audit trail
+        await context.db.query(`
+          INSERT INTO audit_stamps (entity_type, entity_id, action, actor_id, metadata)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [
+          'ingot',
+          ingot.id,
+          'CAST',
+          smith.id,
+          JSON.stringify({
+            sepulka_id: sepulkaId,
+            build_hash: buildHash,
+            version: version
+          })
+        ]);
 
-        // Clear cache
-        context.dataloaders.sepulka.clear(sepulkaId);
+        // Trigger foundry build process via Redis
+        await context.redis.setex(
+          `foundry:build:${ingot.id}`,
+          3600, // 1 hour expiry
+          JSON.stringify({
+            ingotId: ingot.id,
+            sepulkaId: sepulkaId,
+            buildHash: buildHash,
+            version: version,
+            requestedBy: smith.id,
+            requestedAt: new Date().toISOString()
+          })
+        );
+
+        // Clear cache (if dataloaders exist)
+        if (context.dataloaders?.sepulka?.clear) {
+          context.dataloaders.sepulka.clear(sepulkaId);
+        }
 
         return {
-          ingot,
+          ingot: {
+            ...ingot,
+            artifacts: [] // Initially empty, populated by foundry
+          },
           errors: []
         };
+
       } catch (error) {
-        throw new ServiceError('foundry', `Failed to cast ingot: ${error}`);
+        if (error instanceof NotFoundError || error instanceof ValidationError) {
+          throw error;
+        }
+        throw new ServiceError('database', `Failed to cast ingot: ${error}`);
+      }
+    },
+
+    async deleteSepulka(parent: any, { id }: { id: string }, context: Context) {
+      const { smith } = await requirePermission(context, Permission.DELETE_SEPULKA);
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        throw new ValidationError('Invalid UUID format');
+      }
+
+      try {
+        // Check if sepulka exists and user owns it
+        const sepulkaQuery = await context.db.query(
+          'SELECT * FROM sepulkas WHERE id = $1 AND created_by = $2',
+          [id, smith.id]
+        );
+
+        if (sepulkaQuery.rows.length === 0) {
+          throw new NotFoundError('Sepulka', id);
+        }
+
+        const sepulka = sepulkaQuery.rows[0];
+
+        // Check if sepulka can be deleted (not if it has active ingots)
+        const activeIngotsQuery = await context.db.query(
+          'SELECT COUNT(*) as count FROM ingots WHERE sepulka_id = $1 AND status IN ($2, $3)',
+          [id, 'BUILDING', 'DEPLOYING']
+        );
+
+        const activeIngots = parseInt(activeIngotsQuery.rows[0].count);
+        if (activeIngots > 0) {
+          throw new ValidationError('Cannot delete sepulka with active builds or deployments');
+        }
+
+        // Delete sepulka and related data
+        await context.db.query('BEGIN');
+        
+        try {
+          // Delete sepulka-alloy associations
+          await context.db.query('DELETE FROM sepulka_alloys WHERE sepulka_id = $1', [id]);
+          
+          // Delete completed ingots (if any)
+          await context.db.query('DELETE FROM ingots WHERE sepulka_id = $1', [id]);
+          
+          // Delete audit stamps
+          await context.db.query('DELETE FROM audit_stamps WHERE entity_type = $1 AND entity_id = $2', ['sepulka', id]);
+          
+          // Delete the sepulka itself
+          await context.db.query('DELETE FROM sepulkas WHERE id = $1', [id]);
+          
+          await context.db.query('COMMIT');
+
+          // Clear cache
+          if (context.dataloaders?.sepulka?.clear) {
+            context.dataloaders.sepulka.clear(id);
+          }
+
+          return {
+            success: true,
+            errors: []
+          };
+
+        } catch (error) {
+          await context.db.query('ROLLBACK');
+          throw error;
+        }
+
+      } catch (error) {
+        if (error instanceof NotFoundError || error instanceof ValidationError) {
+          throw error;
+        }
+        throw new ServiceError('database', `Failed to delete sepulka: ${error}`);
       }
     },
 
@@ -191,6 +308,10 @@ export const sepulkaResolvers = {
   },
 
   Sepulka: {
+    // Field mapping for snake_case to camelCase
+    createdAt: (parent: any) => parent.created_at,
+    updatedAt: (parent: any) => parent.updated_at,
+    
     async pattern(parent: any, args: any, context: Context) {
       if (!parent.pattern_id) return null;
       return await context.dataloaders.pattern.load(parent.pattern_id);
@@ -210,6 +331,19 @@ export const sepulkaResolvers = {
 
     async createdBy(parent: any, args: any, context: Context) {
       return await context.dataloaders.smith.load(parent.created_by);
+    }
+  },
+
+  Ingot: {
+    // Field mapping for snake_case to camelCase
+    sepulkaId: (parent: any) => parent.sepulka_id,
+    buildHash: (parent: any) => parent.build_hash,
+    createdAt: (parent: any) => parent.created_at,
+    
+    async artifacts(parent: any, args: any, context: Context) {
+      // For now, return empty array as artifacts are generated during foundry process
+      // In production, this would query the artifact storage system
+      return [];
     }
   }
 };

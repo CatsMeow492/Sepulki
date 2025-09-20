@@ -29,6 +29,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [authMode, setAuthMode] = useState<'mock' | 'real' | 'none'>('none')
 
+  // Update global auth state for GraphQL client
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__SEPULKI_AUTH__ = { smith, authMode };
+    }
+  }, [smith, authMode]);
+
   useEffect(() => {
     // Environment-aware authentication setup
     if (shouldUseMockAuth()) {
@@ -78,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('🔄 Falling back to instant mock auth')
       // Fallback to instant login if local auth service is down
       setSmith({
-        id: 'dev-smith-001',
+        id: 'c1f8431f-e264-4701-9ce6-2fcc3362c649',
         name: 'Development Smith',
         email: 'dev@sepulki.com',
         image: '',
