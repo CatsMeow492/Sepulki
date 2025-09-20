@@ -3,18 +3,35 @@
   "version": "1.0.0",
   "description": "Robotics-as-a-Service platform with metallurgy-themed branding",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "services/*", 
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "services/*", 
+      "packages/*"
+    ]
+  },
   "engines": {
     "node": ">=18.18.0"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev:hammer\" \"npm run dev:forge\"",
+    "dev": "./scripts/dev-tools.sh start",
     "dev:forge": "npm --workspace @sepulki/forge-ui run dev",
     "dev:hammer": "npm --workspace @sepulki/hammer-orchestrator run dev",
+    "stop": "./scripts/dev-tools.sh stop",
+    "restart": "./scripts/dev-tools.sh restart",
+    "status": "./scripts/dev-tools.sh status",
+    "auth:setup": "./scripts/setup-local-auth.sh",
+    "auth:start": "docker-compose up -d local-auth mailhog fake-sms",
+    "auth:stop": "docker-compose stop local-auth mailhog fake-sms", 
+    "auth:logs": "docker-compose logs -f local-auth mailhog fake-sms",
+    "auth:signin": "open http://localhost:4446/auth/signin",
+    "email:open": "open http://localhost:8025",
+    "sms:open": "open http://localhost:1081",
+    "oauth:open": "open http://localhost:3001",
+    "env:status": "./scripts/env-switch.sh status",
+    "env:mock": "./scripts/env-switch.sh mock",
+    "env:github": "./scripts/env-switch.sh github",
+    "env:production": "./scripts/env-switch.sh production",
     "build": "npm run build:packages && npm run build:services && npm run build:apps",
     "build:packages": "npm run build --workspaces --if-present",
     "build:services": "npm run build --workspace @sepulki/hammer-orchestrator",
@@ -26,12 +43,16 @@
     "test:e2e": "npm run test:e2e --workspace @sepulki/forge-ui",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "db:migrate": "npm run migrate --workspace @sepulki/hammer-orchestrator",
-    "db:seed": "npm run seed --workspace @sepulki/hammer-orchestrator",
+    "docker:logs": "./scripts/dev-tools.sh logs",
+    "docker:reset": "docker-compose down -v && docker-compose up -d",
+    "db": "./scripts/db-setup.sh",
+    "db:status": "./scripts/db-setup.sh status",
+    "db:reset": "./scripts/db-setup.sh reset",
+    "db:seed": "./scripts/db-setup.sh seed",
+    "db:test-data": "./scripts/dev-tools.sh test-data",
     "migrate": "./scripts/migrate-to-sepulki.sh",
     "clean": "npm run clean --workspaces --if-present",
-    "reset": "npm run clean && rm -rf node_modules && npm install"
+    "reset": "./scripts/dev-tools.sh reset"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^10.6.1",

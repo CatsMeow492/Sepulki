@@ -46,6 +46,82 @@ services:
     volumes:
       - minio_data:/data
 
+  # Local Authentication Services (Auth.js LocalStack equivalent)
+  
+  # Local OAuth2/OIDC Provider (like local GitHub/Google)
+  local-oauth:
+    image: oryd/hydra:v2.2.0
+    command: serve all --dev
+    environment:
+      DSN: postgres://smith:forge_dev@postgres:5432/hydra?sslmode=disable
+      URLS_SELF_ISSUER: http://localhost:4444
+      URLS_CONSENT: http://localhost:3001/consent
+      URLS_LOGIN: http://localhost:3001/login
+      SERVE_PUBLIC_PORT: 4444
+      SERVE_ADMIN_PORT: 4445
+      LOG_LEVEL: debug
+    ports:
+      - "4444:4444"  # Public endpoint
+      - "4445:4445"  # Admin endpoint
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # OAuth Consent/Login UI
+  oauth-ui:
+    image: oryd/hydra-login-consent-node:v2.2.0
+    environment:
+      HYDRA_ADMIN_URL: http://local-oauth:4445
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
+    ports:
+      - "3001:3000"
+    depends_on:
+      - local-oauth
+    restart: unless-stopped
+
+  # Local Email Service (like local SendGrid/SES)
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+
+  # Local SMS Service (for 2FA testing)
+  fake-sms:
+    image: mockserver/mockserver:latest
+    environment:
+      MOCKSERVER_SERVER_PORT: 1080
+      MOCKSERVER_WATCH_INITIALIZATION_JSON: "true"
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/sms-mock.json
+    ports:
+      - "1080:1080"  # SMS Mock API
+      - "1081:1080"  # Dashboard
+    volumes:
+      - ./dev-services/sms-mock.json:/config/sms-mock.json
+    restart: unless-stopped
+
+  # Local Auth Service (LocalStack equivalent for Auth.js)
+  local-auth:
+    build:
+      context: .
+      dockerfile: services/local-auth/Dockerfile
+    ports:
+      - "4446:4446"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: local-auth-jwt-secret
+      CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/local-auth:/app
+      - /app/node_modules
+    command: npm run dev
+
   # Core Services
   hammer-orchestrator:
     build: 
@@ -66,119 +142,120 @@ services:
       - /app/node_modules
     command: npm run dev
 
-  foundry-pipeline:
-    build:
-      context: .
-      dockerfile: services/foundry-pipeline/Dockerfile
-    ports:
-      - "4001:4001"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: sepulki
-      MINIO_SECRET_KEY: vault_dev_key
-    depends_on:
-      - postgres
-      - minio
-    volumes:
-      - ./services/foundry-pipeline:/app
-      - /app/node_modules
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: npm run dev
+  # Commented out missing services - can be enabled when implementations are ready
+  # foundry-pipeline:
+  #   build:
+  #     context: .
+  #     dockerfile: services/foundry-pipeline/Dockerfile
+  #   ports:
+  #     - "4001:4001"
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+  #     MINIO_ENDPOINT: minio:9000
+  #     MINIO_ACCESS_KEY: sepulki
+  #     MINIO_SECRET_KEY: vault_dev_key
+  #   depends_on:
+  #     - postgres
+  #     - minio
+  #   volumes:
+  #     - ./services/foundry-pipeline:/app
+  #     - /app/node_modules
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: npm run dev
 
-  vault-registry:
-    build:
-      context: .
-      dockerfile: services/vault-registry/Dockerfile
-    ports:
-      - "4002:4002"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: sepulki
-      MINIO_SECRET_KEY: vault_dev_key
-    depends_on:
-      - postgres
-      - minio
-    volumes:
-      - ./services/vault-registry:/app
-      - /app/node_modules
-    command: npm run dev
+  # vault-registry:
+  #   build:
+  #     context: .
+  #     dockerfile: services/vault-registry/Dockerfile
+  #   ports:
+  #     - "4002:4002"
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+  #     MINIO_ENDPOINT: minio:9000
+  #     MINIO_ACCESS_KEY: sepulki
+  #     MINIO_SECRET_KEY: vault_dev_key
+  #   depends_on:
+  #     - postgres
+  #     - minio
+  #   volumes:
+  #     - ./services/vault-registry:/app
+  #     - /app/node_modules
+  #   command: npm run dev
 
-  bellows-telemetry:
-    build:
-      context: .
-      dockerfile: services/bellows-telemetry/Dockerfile
-    ports:
-      - "4003:4003"
-    environment:
-      NODE_ENV: development
-      INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: dev_token
-      INFLUXDB_ORG: sepulki
-      INFLUXDB_BUCKET: bellows
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - influxdb
-      - redis
-    volumes:
-      - ./services/bellows-telemetry:/app
-      - /app/node_modules
-    command: npm run dev
+  # bellows-telemetry:
+  #   build:
+  #     context: .
+  #     dockerfile: services/bellows-telemetry/Dockerfile
+  #   ports:
+  #     - "4003:4003"
+  #   environment:
+  #     NODE_ENV: development
+  #     INFLUXDB_URL: http://influxdb:8086
+  #     INFLUXDB_TOKEN: dev_token
+  #     INFLUXDB_ORG: sepulki
+  #     INFLUXDB_BUCKET: bellows
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     - influxdb
+  #     - redis
+  #   volumes:
+  #     - ./services/bellows-telemetry:/app
+  #     - /app/node_modules
+  #   command: npm run dev
 
-  tongs-policy:
-    build:
-      context: .
-      dockerfile: services/tongs-policy/Dockerfile
-    ports:
-      - "4004:4004"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./services/tongs-policy:/app
-      - /app/node_modules
-    command: npm run dev
+  # tongs-policy:
+  #   build:
+  #     context: .
+  #     dockerfile: services/tongs-policy/Dockerfile
+  #   ports:
+  #     - "4004:4004"
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   volumes:
+  #     - ./services/tongs-policy:/app
+  #     - /app/node_modules
+  #   command: npm run dev
 
-  choreo-dispatch:
-    build:
-      context: .
-      dockerfile: services/choreo-dispatch/Dockerfile
-    ports:
-      - "4005:4005"
-    environment:
-      PYTHONPATH: /app
-      DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./services/choreo-dispatch:/app
-    command: python src/main.py
+  # choreo-dispatch:
+  #   build:
+  #     context: .
+  #     dockerfile: services/choreo-dispatch/Dockerfile
+  #   ports:
+  #     - "4005:4005"
+  #   environment:
+  #     PYTHONPATH: /app
+  #     DATABASE_URL: postgresql://smith:forge_dev@postgres:5432/sepulki
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   volumes:
+  #     - ./services/choreo-dispatch:/app
+  #   command: python src/main.py
 
-  # Frontend
-  forge-ui:
-    build:
-      context: .
-      dockerfile: apps/forge-ui/Dockerfile.dev
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: development
-      NEXT_PUBLIC_GRAPHQL_ENDPOINT: http://localhost:4000/graphql
-      NEXT_PUBLIC_MINIO_ENDPOINT: http://localhost:9000
-    volumes:
-      - ./apps/forge-ui:/app
-      - /app/node_modules
-      - /app/.next
-    command: npm run dev
+  # Frontend - runs standalone for now, will containerize when Dockerfile.dev is created
+  # forge-ui:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/forge-ui/Dockerfile.dev
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     NODE_ENV: development
+  #     NEXT_PUBLIC_GRAPHQL_ENDPOINT: http://localhost:4000/graphql
+  #     NEXT_PUBLIC_MINIO_ENDPOINT: http://localhost:9000
+  #   volumes:
+  #     - ./apps/forge-ui:/app
+  #     - /app/node_modules
+  #     - /app/.next
+  #   command: npm run dev
 
 volumes:
   postgres_data:

@@ -13,7 +13,7 @@
   "keywords": ["sepulki", "robotics", "sdk", "graphql", "typescript"],
   "dependencies": {
     "@apollo/client": "^3.8.0",
-    "@sepulki/shared-types": "workspace:*",
+    "@sepulki/shared-types": "file:../shared-types",
     "graphql": "^16.8.0",
     "graphql-ws": "^5.14.0"
   },

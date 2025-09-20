@@ -5,3 +5,10 @@ out
 .env
 .env.local
 .DS_Store
+# Local Environment Files
+.env.local
+**/.env.local
+# Environment files (local development only)
+.env.local
+**/.env.local
+.env

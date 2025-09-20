@@ -126,7 +126,21 @@ type Smith {
   name: String!
   role: SmithRole!
   permissions: [Permission!]!
+  preferences: JSON
   createdAt: DateTime!
+}
+
+type Session {
+  smithId: ID!
+  token: String!
+  refreshToken: String!
+  expiresAt: DateTime!
+}
+
+type AuthPayload {
+  session: Session
+  smith: Smith
+  errors: [Error!]
 }
 
 type BellowsStream {
@@ -146,7 +160,155 @@ type Edict {
   active: Boolean!
 }
 
+# Missing Core Types
+type AlloyCompatibility {
+  alloyId: ID!
+  compatibleWith: [ID!]!
+  constraints: JSON
+}
+
+type BuildArtifact {
+  type: String!
+  path: String!
+  size: Int!
+  checksum: String!
+}
+
+type TemperResults {
+  metrics: JSON!
+  improvements: JSON
+  recommendations: [String!]
+  optimizedParameters: JSON
+}
+
+type RobotPose {
+  position: Coordinates!
+  orientation: JSON!
+  jointPositions: JSON
+  timestamp: DateTime!
+}
+
+type RunMetrics {
+  duration: Int!
+  energyConsumed: Float
+  accuracy: Float
+  errors: Int!
+  warnings: Int!
+  performance: JSON
+}
+
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+  altitude: Float
+}
+
+type SafetyZone {
+  id: ID!
+  name: String!
+  type: String!
+  boundaries: JSON!
+  restrictions: [String!]!
+}
+
+type TelemetryMetric {
+  name: String!
+  value: Float!
+  unit: String
+  timestamp: DateTime!
+}
+
+type TelemetryEvent {
+  id: ID!
+  robotId: ID!
+  type: String!
+  data: JSON!
+  timestamp: DateTime!
+}
+
+type Error {
+  code: String!
+  message: String!
+  field: String
+}
+
+type Deployment {
+  id: ID!
+  ingotId: ID!
+  fleetId: ID!
+  status: String!
+  rolloutPercent: Int!
+  createdAt: DateTime!
+}
+
+type TaskAssignment {
+  taskId: ID!
+  robotId: ID!
+  confidence: Float!
+  estimatedDuration: Int
+  assignedAt: DateTime!
+}
+
+type PolicyBreach {
+  id: ID!
+  edictId: ID!
+  robotId: ID
+  fleetId: ID
+  severity: EdictSeverity!
+  message: String!
+  data: JSON
+  timestamp: DateTime!
+}
+
 # Enums
+enum PatternCategory {
+  INDUSTRIAL_ARM
+  MOBILE_ROBOT
+  HUMANOID
+  QUADRUPED
+  DRONE
+  CUSTOM
+}
+
+enum TaskType {
+  PICK_AND_PLACE
+  ASSEMBLY
+  INSPECTION
+  TRANSPORT
+  MAINTENANCE
+  PATROL
+  CUSTOM
+}
+
+enum Permission {
+  FORGE_SEPULKA
+  EDIT_SEPULKA
+  DELETE_SEPULKA
+  CAST_INGOT
+  TEMPER_INGOT
+  QUENCH_TO_FLEET
+  RECALL_FLEET
+  EMERGENCY_STOP
+  VIEW_FLEET
+  MANAGE_FLEET
+  VIEW_ROBOTS
+  MANAGE_ROBOTS
+  CREATE_TASK
+  ASSIGN_TASK
+  CANCEL_TASK
+  VIEW_TASKS
+  VIEW_CATALOG
+  MANAGE_ALLOYS
+  MANAGE_PATTERNS
+  VIEW_EDICTS
+  MANAGE_EDICTS
+  VIEW_BELLOWS
+  EXPORT_TELEMETRY
+  MANAGE_SMITHS
+  SYSTEM_CONFIG
+  AUDIT_LOGS
+}
+
 enum SepulkaStatus {
   FORGING
   CAST_READY
@@ -264,6 +426,52 @@ input TemperGoal {
   weight: Float = 1.0
 }
 
+# Filter Input Types
+input SepulkaFilter {
+  status: SepulkaStatus
+  createdBy: ID
+  patternId: ID
+  tags: [String!]
+}
+
+input AlloyFilter {
+  type: AlloyType
+  tags: [String!]
+  compatibility: ID
+}
+
+input FleetFilter {
+  status: FleetStatus
+  locusId: ID
+}
+
+input TaskFilter {
+  status: TaskStatus
+  type: TaskType
+  priority: TaskPriority
+  assignedRobotId: ID
+}
+
+input TimeRange {
+  start: DateTime!
+  end: DateTime!
+}
+
+input EdictInput {
+  name: String!
+  description: String
+  type: EdictType!
+  rules: JSON!
+  severity: EdictSeverity!
+  active: Boolean = true
+  appliesTo: JSON
+}
+
+input LoginCredentials {
+  email: String!
+  password: String!
+}
+
 # Mutation Payloads
 type ForgeSepulkaPayload {
   sepulka: Sepulka
@@ -324,6 +532,11 @@ type Query {
 
 # Mutations
 type Mutation {
+  # Authentication
+  login(credentials: LoginCredentials!): AuthPayload!
+  refreshToken(refreshToken: String!): AuthPayload!
+  logout: Boolean!
+  
   # Design & Build
   forgeSepulka(input: ForgeInput!): ForgeSepulkaPayload!
   castIngot(sepulkaId: ID!): CastIngotPayload!

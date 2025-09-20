@@ -1,0 +1,41 @@
+[
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/sms/send",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "messageId": "mock-sms-${random:uuid}",
+        "status": "sent",
+        "to": "${json-unit.matches:body:$.to}",
+        "message": "${json-unit.matches:body:$.message}",
+        "timestamp": "${json-unit.matches:timestamp}"
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/sms/status/*"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "messageId": "${request.path[2]}",
+        "status": "delivered",
+        "deliveredAt": "${json-unit.matches:timestamp}"
+      }
+    }
+  }
+]
