@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/components/AuthProvider'
+import { RouteGuard } from '@/components/RouteGuard'
 import { useState, useEffect } from 'react'
 
 // Mock data that would come from GraphQL API
@@ -45,7 +46,7 @@ const mockFleetData = {
   ]
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const { smith } = useAuth()
   const [data, setData] = useState(mockFleetData)
   const [selectedFleet, setSelectedFleet] = useState<string | null>(null)
@@ -295,4 +296,12 @@ export default function DashboardPage() {
       </div>
     </div>
   )
+}
+
+export default function DashboardPage() {
+  return (
+    <RouteGuard requiresAuth={true} minRole="SMITH">
+      <DashboardPageContent />
+    </RouteGuard>
+  );
 }

@@ -4,6 +4,8 @@ import "./globals.css";
 import Link from "next/link";
 import { AuthProvider } from "@/components/AuthProvider";
 import { SmithProfile } from "@/components/SmithProfile";
+import { ProtectedNavigation, AuthenticationButton } from "@/components/ProtectedNavigation";
+import { DemoModeProvider } from "@/components/DemoModeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,7 +23,8 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <div className="min-h-screen bg-gray-50">
+          <DemoModeProvider>
+            <div className="min-h-screen bg-gray-50">
             <nav className="bg-white shadow-sm">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
@@ -31,41 +34,11 @@ export default function RootLayout({
                         🔥 Sepulki
                       </Link>
                     </div>
-                    <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                      <Link
-                        href="/configure"
-                        className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
-                      >
-                        Forge Robot
-                      </Link>
-                      <Link
-                        href="/designs"
-                        className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
-                      >
-                        My Designs
-                      </Link>
-                      <Link
-                        href="/dashboard"
-                        className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
-                      >
-                        Fleet Dashboard
-                      </Link>
-                      <Link
-                        href="/pricing"
-                        className="text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-orange-500"
-                      >
-                        Pricing
-                      </Link>
-                    </div>
+                    <ProtectedNavigation />
                   </div>
                   <div className="flex items-center space-x-4">
                     <SmithProfile />
-                    <Link
-                      href="/auth/signin"
-                      className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                    >
-                      Get Started
-                    </Link>
+                    <AuthenticationButton />
                   </div>
                 </div>
               </div>
@@ -79,6 +52,7 @@ export default function RootLayout({
               </div>
             </footer>
           </div>
+          </DemoModeProvider>
         </AuthProvider>
       </body>
     </html>

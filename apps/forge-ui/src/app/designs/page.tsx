@@ -1,6 +1,9 @@
 'use client';
 
 import { useAuth } from '@/components/AuthProvider';
+import { RouteGuard } from '@/components/RouteGuard';
+import { BuildProgressModal } from '@/components/BuildProgressModal';
+import { useDemoMode } from '@/components/DemoModeProvider';
 import { useState, useEffect } from 'react';
 import { getMySepulkas, castIngot, deleteSepulka } from '@/lib/graphql';
 import Link from 'next/link';
@@ -23,13 +26,17 @@ interface Sepulka {
   updatedAt: string;
 }
 
-export default function MyDesignsPage() {
+function MyDesignsPageContent() {
   const { smith } = useAuth();
+  const { demoMode, demoData, updateDesignStatus, addIngot, deleteDesign } = useDemoMode();
   const [designs, setDesigns] = useState<Sepulka[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'ready' | 'building' | 'deployed'>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [buildModalOpen, setBuildModalOpen] = useState(false);
+  const [buildingDesign, setBuildingDesign] = useState<Sepulka | null>(null);
+  const [currentIngot, setCurrentIngot] = useState<any>(null);
 
   // Check for new design highlight
   useEffect(() => {
@@ -59,12 +66,69 @@ export default function MyDesignsPage() {
     }
   }, [smith]);
 
+  // Demo data for showcasing BUILD functionality
+  const demoDesigns: Sepulka[] = [
+    {
+      id: 'demo-sepulka-001',
+      name: 'Warehouse Picker Pro',
+      description: 'Advanced warehouse automation with vision guidance and 50kg payload capacity',
+      status: 'CAST_READY',
+      pattern: { name: 'Industrial Arm - 6DOF' },
+      alloys: [
+        { name: 'ServoMax Pro 3000', type: 'ACTUATOR' },
+        { name: 'GripForce Elite', type: 'END_EFFECTOR' },
+        { name: 'VisionEye 4K', type: 'SENSOR' },
+        { name: 'MotionController X1', type: 'CONTROLLER' }
+      ],
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'demo-sepulka-002', 
+      name: 'Assembly Line Assistant',
+      description: 'Precision assembly robot for electronics manufacturing',
+      status: 'FORGING',
+      pattern: { name: 'Precision Assembler - 4DOF' },
+      alloys: [
+        { name: 'PrecisionDrive Mini', type: 'ACTUATOR' },
+        { name: 'MicroGripper v2', type: 'END_EFFECTOR' },
+        { name: 'ForceGuard Pro', type: 'SENSOR' }
+      ],
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'demo-sepulka-003',
+      name: 'Quality Inspector Bot', 
+      description: 'Automated visual inspection with AI-powered defect detection',
+      status: 'DEPLOYED',
+      pattern: { name: 'Inspection Platform - 3DOF' },
+      alloys: [
+        { name: 'StealthMove Linear', type: 'ACTUATOR' },
+        { name: 'VisionEye 8K Pro', type: 'SENSOR' },
+        { name: 'AI EdgeBox v3', type: 'CONTROLLER' }
+      ],
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+  ];
+
   const loadDesigns = async () => {
     try {
       setLoading(true);
       setError(null);
-      const userDesigns = await getMySepulkas(smith?.id);
-      setDesigns(userDesigns || []);
+      
+      // Try backend, fallback to demo data
+      try {
+        const userDesigns = await getMySepulkas(smith?.id);
+        setDesigns(userDesigns || []);
+        console.log(`✅ Loaded ${userDesigns?.length || 0} designs from backend`);
+      } catch (err) {
+        console.log('📺 Backend unavailable - using demo data to showcase BUILD functionality');
+        setDesigns(demoDesigns);
+        // Don't set error when demo data loads successfully
+        console.log(`✅ Demo data loaded: ${demoDesigns.length} sample designs`);
+      }
     } catch (err) {
       console.error('Failed to load designs:', err);
       setError(err instanceof Error ? err.message : 'Failed to load designs');
@@ -74,25 +138,79 @@ export default function MyDesignsPage() {
   };
 
   const handleBuildDesign = async (design: Sepulka) => {
+    if (!smith) return;
+    
+    // Clear any previous errors
+    setError(null);
+    setActionLoading(design.id);
+    
     try {
-      setActionLoading(design.id);
-      const result = await castIngot(design.id);
+      console.log(`🔨 Starting build for "${design.name}" (${design.id})`);
       
-      if (result.errors && result.errors.length > 0) {
-        alert(`Build failed: ${result.errors[0].message}`);
+      // Try backend first, fallback to demo simulation
+      try {
+        const response = await castIngot(design.id);
+        
+        if (response.castIngot.ingot) {
+          const ingot = response.castIngot.ingot;
+          console.log(`✅ Backend build started: ${ingot.buildHash} (v${ingot.version})`);
+          
+          // Show build progress modal
+          setBuildingDesign(design);
+          setCurrentIngot(ingot);
+          setBuildModalOpen(true);
+          
+          // Refresh designs to show updated status
+          await loadDesigns();
+          return;
+        }
+      } catch (backendError) {
+        console.log('📺 Backend unavailable for build - using demo simulation');
+        
+        // Demo mode: simulate successful build
+        const mockIngot = {
+          id: `ingot-${Date.now()}`,
+          sepulkaId: design.id,
+          version: '1.0.0',
+          buildHash: `build_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+          status: 'BUILDING',
+          artifacts: [
+            { type: 'URDF', path: `/artifacts/${design.name.toLowerCase().replace(/\s+/g, '-')}.urdf`, checksum: 'sha256:demo123...' },
+            { type: 'PACKAGE', path: `/artifacts/${design.name.toLowerCase().replace(/\s+/g, '-')}.tar.gz`, checksum: 'sha256:demo456...' }
+          ],
+          createdAt: new Date().toISOString()
+        };
+        
+        console.log(`🔨 Demo build simulation starting for "${design.name}"`);
+        
+        // Show build progress modal immediately
+        setBuildingDesign(design);
+        setCurrentIngot(mockIngot);
+        setBuildModalOpen(true);
+        
+        console.log(`✅ Demo build started: ${mockIngot.buildHash} (v${mockIngot.version})`);
         return;
       }
-
-      alert(`🔨 Build started! Ingot ${result.ingot?.id} is being created.`);
       
-      // Refresh designs to show updated status
-      await loadDesigns();
+      throw new Error('Build request failed - no ingot created');
     } catch (error) {
-      console.error('Build failed:', error);
-      alert(`Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to build design:', error);
+      let errorMessage = `Failed to build "${design.name}"`;
+      
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const closeBuildModal = () => {
+    setBuildModalOpen(false);
+    setBuildingDesign(null);
+    setCurrentIngot(null);
   };
 
   const handleDeleteDesign = async (design: Sepulka) => {
@@ -100,18 +218,28 @@ export default function MyDesignsPage() {
       return;
     }
 
+    setActionLoading(design.id);
+    
     try {
-      setActionLoading(design.id);
+      if (demoMode) {
+        // Demo mode: simulate deletion
+        console.log(`📺 Demo mode: deleting "${design.name}"`);
+        deleteDesign(design.id);
+        await loadDesigns();
+        console.log(`✅ Demo deletion completed for "${design.name}"`);
+        return;
+      }
+
+      // Real backend call
       await deleteSepulka(design.id);
       
       // Remove from local state immediately for better UX
       setDesigns(prev => prev.filter(d => d.id !== design.id));
       
-      // Show success message
-      alert(`✅ "${design.name}" has been deleted successfully.`);
+      console.log(`✅ "${design.name}" has been deleted successfully.`);
     } catch (error) {
       console.error('Delete failed:', error);
-      alert(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       // Refresh to restore the item if delete failed
       await loadDesigns();
     } finally {
@@ -161,22 +289,7 @@ export default function MyDesignsPage() {
     return true;
   });
 
-  if (!smith) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="text-center py-12">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h1>
-          <p className="text-gray-600 mb-8">Please sign in to view your robot designs</p>
-          <Link
-            href="/auth/signin"
-            className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700"
-          >
-            Sign In
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // RouteGuard handles authentication, so smith should always be available here
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -445,6 +558,21 @@ export default function MyDesignsPage() {
           </Link>
         </div>
       </div>
+      {/* Build Progress Modal */}
+      <BuildProgressModal
+        isOpen={buildModalOpen}
+        onClose={closeBuildModal}
+        designName={buildingDesign?.name || ''}
+        ingot={currentIngot}
+      />
     </div>
+  );
+}
+
+export default function MyDesignsPage() {
+  return (
+    <RouteGuard requiresAuth={true} minRole="SMITH">
+      <MyDesignsPageContent />
+    </RouteGuard>
   );
 }

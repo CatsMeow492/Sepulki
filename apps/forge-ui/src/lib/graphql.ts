@@ -292,6 +292,28 @@ export const CAST_INGOT_MUTATION = `
   }
 `;
 
+interface CastIngotResponse {
+  castIngot: {
+    ingot?: {
+      id: string;
+      sepulkaId: string;
+      version: string;
+      buildHash: string;
+      status: string;
+      artifacts: Array<{
+        type: string;
+        path: string;
+        checksum: string;
+      }>;
+      createdAt: string;
+    };
+    errors: Array<{
+      code: string;
+      message: string;
+    }>;
+  };
+}
+
 export const DELETE_SEPULKA_MUTATION = `
   mutation DeleteSepulka($id: ID!) {
     deleteSepulka(id: $id) {

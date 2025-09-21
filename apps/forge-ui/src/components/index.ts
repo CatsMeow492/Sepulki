@@ -1,8 +1,12 @@
+export { AuthProvider } from './AuthProvider';
+export { BuildProgressModal } from './BuildProgressModal';
+export { DemoModeProvider, useDemoMode } from './DemoModeProvider';
 export { ErrorBanner } from './ErrorBanner';
 export { JointControls } from './JointControls';
+export { ProtectedNavigation, AuthenticationButton } from './ProtectedNavigation';
 export { RobotModel } from './RobotModel';
-export { Scene3D } from './Scene3D';
-export { StaticModel } from './StaticModel';
-export { AuthProvider } from './AuthProvider';
-export { SmithProfile } from './SmithProfile';
+export { RouteGuard } from './RouteGuard';
 export { SaveDesignModal } from './SaveDesignModal';
+export { Scene3D } from './Scene3D';
+export { SmithProfile } from './SmithProfile';
+export { StaticModel } from './StaticModel';

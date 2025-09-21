@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { SuggestedComponents } from './SuggestedComponents'
 import type { RobotSpec } from '@/types/robot';
@@ -370,13 +371,21 @@ function ConfigureContent() {
         </button>
         
         <div className="flex space-x-3">
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 flex items-center"
-            disabled={!smith}
-          >
-            🔥 Save Design
-          </button>
+          {smith ? (
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 flex items-center"
+            >
+              🔥 Save Design
+            </button>
+          ) : (
+            <Link
+              href="/auth/signin"
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center"
+            >
+              🔐 Sign In to Save
+            </Link>
+          )}
           <button
             onClick={() => router.push('/review')}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

@@ -37,6 +37,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [smith, authMode]);
 
   useEffect(() => {
+    // Check if auth state was explicitly cleared for testing (only if explicitly set to stay signed out)
+    const authData = (window as any).__SEPULKI_AUTH__;
+    if (authData && authData.smith === null && authData.authMode === 'mock' && authData.staySignedOut === true) {
+      console.log('🔧 Authentication explicitly cleared for testing - staying signed out');
+      setSmith(null);
+      setAuthMode('mock');
+      setLoading(false);
+      return;
+    }
+
     // Environment-aware authentication setup
     if (shouldUseMockAuth()) {
       // Development mode with LOCAL AUTH SERVICE (like LocalStack)
@@ -82,7 +92,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('❌ Local auth service not available:', error)
-      console.log('🔄 Falling back to instant mock auth')
+      
+      // Check if auth was explicitly cleared for testing (only if explicitly marked)
+      const authData = (window as any).__SEPULKI_AUTH__;
+      if (authData && authData.smith === null && authData.staySignedOut === true) {
+        console.log('🔧 Authentication explicitly cleared for testing - staying signed out');
+        setSmith(null);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🔄 Falling back to Development Smith mock authentication')
       // Fallback to instant login if local auth service is down
       setSmith({
         id: 'c1f8431f-e264-4701-9ce6-2fcc3362c649',
@@ -97,6 +117,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     setSmith(null)
+    
+    // Update global auth state to reflect signed out status
+    if (typeof window !== 'undefined') {
+      (window as any).__SEPULKI_AUTH__ = { smith: null, authMode, staySignedOut: true };
+    }
+    
     if (authMode === 'real') {
       // Production: NextAuth.js signOut
       // signOut() from next-auth/react
@@ -111,7 +137,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         window.location.href = '/'
       } catch (error) {
         console.error('❌ Local auth signout failed:', error)
-        // Fallback: just redirect
+        // Fallback: just redirect to home without reloading auth
+        console.log('🔄 Staying signed out due to service unavailability')
         window.location.href = '/'
       }
     }
