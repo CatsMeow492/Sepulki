@@ -51,9 +51,9 @@ graph TB
 
 ### 🧪 Development Setup (macOS Compatible)
 
-```bash
+   ```bash
 # 1. Clone and navigate to service
-cd services/anvil-sim
+   cd services/anvil-sim
 
 # 2. Start development environment
 ./scripts/dev-start.sh

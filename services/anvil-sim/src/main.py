@@ -138,6 +138,10 @@ class AnvilSimService:
             
             session_id = f"session_{int(datetime.utcnow().timestamp())}_{len(self.active_sessions)}"
             
+            # Extract Isaac Sim robot configuration
+            isaac_sim_robot = data.get('isaac_sim_robot')
+            physics_config = data.get('physics_config', {})
+
             session = {
                 'id': session_id,
                 'user_id': data.get('user_id', 'anonymous'),
@@ -148,13 +152,31 @@ class AnvilSimService:
                 'created_at': datetime.utcnow().isoformat(),
                 'isaac_sim_mode': ISAAC_SIM_AVAILABLE,
                 'urdf_content': data.get('urdf_content', ''),
-                'webrtc_ready': True  # Real service supports WebRTC
+                'webrtc_ready': True,  # Real service supports WebRTC
+                # NEW: Isaac Sim robot configuration
+                'isaac_sim_robot': isaac_sim_robot,
+                'robot_name': isaac_sim_robot.get('name') if isaac_sim_robot else 'Default Robot',
+                'isaac_sim_path': isaac_sim_robot.get('isaac_sim_path') if isaac_sim_robot else None,
+                'physics_config': physics_config
             }
             
             self.active_sessions[session_id] = session
             
+            # Update video generator with robot configuration
+            if isaac_sim_robot:
+                import sys
+                import os
+                sys.path.append(os.path.dirname(__file__))
+                from video_frame_generator import get_video_generator
+                get_video_generator().update_robot_config({
+                    'name': isaac_sim_robot.get('name', 'Unknown Robot'),
+                    'isaac_sim_path': isaac_sim_robot.get('isaac_sim_path'),
+                    'specifications': isaac_sim_robot.get('specifications', {})
+                })
+                
             logger.info("Isaac Sim session created", session_id=session_id, 
-                       user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE)
+                       user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE,
+                       robot_name=session.get('robot_name', 'Default Robot'))
             
             return web.json_response({
                 'success': True,

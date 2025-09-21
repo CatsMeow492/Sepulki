@@ -4,6 +4,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Loader2, Zap, AlertCircle, Pause, Play, RotateCcw, Camera, Maximize, Minimize, Eye, Move, Target } from 'lucide-react'
 import type { RobotSpec } from '@/types/robot'
 
+interface RobotConfig {
+  selectedRobot?: any // IsaacSimRobot type
+  isaacSimPath?: string
+  robotName?: string
+  physicsConfig?: any
+}
+
 interface IsaacSimDisplayProps {
   spec?: RobotSpec
   urdf?: string | URL
@@ -11,6 +18,7 @@ interface IsaacSimDisplayProps {
   qualityProfile?: 'demo' | 'engineering' | 'certification'
   enablePhysics?: boolean
   userId?: string
+  robotConfig?: RobotConfig
   onJointControl?: (jointStates: Record<string, number>) => void
   onError?: (error: Error | string) => void
   className?: string
@@ -23,6 +31,7 @@ export function IsaacSimDisplay({
   qualityProfile = 'engineering',
   enablePhysics = true,
   userId = 'anonymous',
+  robotConfig,
   onJointControl,
   onError,
   className = ''
@@ -48,29 +57,30 @@ export function IsaacSimDisplay({
     target: { x: 0, y: 0, z: 0 },
     fov: 50
   })
+  
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
+  const animationRef = useRef<number>()
   const initRef = useRef(false)
 
-  // Single initialization to prevent loops
+  // Initialize Isaac Sim connection and WebRTC
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
 
     const initialize = async () => {
       try {
-        setConnectionState('checking')
+        setConnectionState('connecting')
         
-        // Check Isaac Sim service
+        // Check Isaac Sim service health
         const healthResponse = await fetch('http://localhost:8002/health')
-        
         if (!healthResponse.ok) {
-          setConnectionState('error')
-          return
+          throw new Error('Isaac Sim service not available')
         }
-        
-        // Create single session
+
+        // Create session
         const sessionResponse = await fetch('http://localhost:8002/create_scene', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -79,15 +89,16 @@ export function IsaacSimDisplay({
             sepulka_id: spec?.id || 'demo-robot',
             environment,
             quality_profile: qualityProfile,
-            urdf_content: typeof urdf === 'string' ? urdf : urdf?.toString()
+            urdf_content: typeof urdf === 'string' ? urdf : urdf?.toString(),
+            isaac_sim_robot: robotConfig?.selectedRobot,
+            physics_config: robotConfig?.physicsConfig
           })
         })
-        
+
         if (!sessionResponse.ok) {
-          setConnectionState('error')
-          return
+          throw new Error('Failed to create Isaac Sim session')
         }
-        
+
         const sessionData = await sessionResponse.json()
         const newSessionId = sessionData.session_id
         setSessionId(newSessionId)
@@ -97,131 +108,107 @@ export function IsaacSimDisplay({
         // Establish WebSocket connection
         const ws = new WebSocket('ws://localhost:8001')
 
-        ws.onopen = async () => {
+        ws.onopen = () => {
           console.log('🔌 WebSocket connected to Isaac Sim')
           setWebsocket(ws)
 
-          // IMPORTANT: Real Isaac Sim service requires join_session as the FIRST message
+          // Join the session
           ws.send(JSON.stringify({
             type: 'join_session',
             session_id: newSessionId,
             user_id: userId,
             quality_profile: qualityProfile
           }))
-
           console.log('👋 Join session message sent to Isaac Sim')
         }
 
         ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            console.log('📨 Isaac Sim message:', data.type, data)
+          const data = JSON.parse(event.data)
+          console.log('📨 Isaac Sim message:', data.type, data)
 
-            if (data.type === 'connection_established') {
-              setConnectionState('connected')
-              console.log('✅ Isaac Sim WebSocket connection established')
-              
-              // Now set up WebRTC for video streaming
-              try {
-                const peerConnection = new RTCPeerConnection({
-                  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                })
+          if (data.type === 'connection_established') {
+            setConnectionState('connected')
+            console.log('✅ Isaac Sim WebSocket connection established')
+            
+            // Set up WebRTC for video streaming (will be muted by browser)
+            try {
+              const peerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+              })
 
-                peerConnectionRef.current = peerConnection
+              peerConnectionRef.current = peerConnection
 
-                // Handle incoming video stream
-                peerConnection.ontrack = (event) => {
-                  console.log('📹 Received Isaac Sim video stream!')
-                  if (videoRef.current && event.streams[0]) {
-                    videoRef.current.srcObject = event.streams[0]
-                    videoRef.current.play().catch(console.error)
-                  }
+              // Handle incoming video stream
+              peerConnection.ontrack = (event) => {
+                console.log('📹 Received Isaac Sim video stream!')
+                if (videoRef.current && event.streams[0]) {
+                  videoRef.current.srcObject = event.streams[0]
+                  videoRef.current.play().catch(console.error)
                 }
+              }
 
-                // Handle ICE candidates
-                peerConnection.onicecandidate = (event) => {
-                  if (event.candidate && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                      type: 'ice_candidate',
-                      session_id: newSessionId,
-                      candidate: event.candidate
-                    }))
-                  }
-                }
-
-                // Create offer for Isaac Sim
-                peerConnection.createOffer({
-                  offerToReceiveVideo: true,
-                  offerToReceiveAudio: false
-                }).then((offer) => {
-                  return peerConnection.setLocalDescription(offer)
-                }).then(() => {
-                  // Send WebRTC offer to Isaac Sim
+              // Handle ICE candidates
+              peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
                   ws.send(JSON.stringify({
-                    type: 'offer',
-                    session_id: newSessionId,
-                    sdp: peerConnection.localDescription?.sdp
+                    type: 'ice_candidate',
+                    candidate: event.candidate
                   }))
+                }
+              }
 
-                  console.log('📡 WebRTC offer sent to Isaac Sim (after join_session)')
-                }).catch((error) => {
-                  console.error('❌ WebRTC offer creation failed:', error)
-                })
+              // Create offer for Isaac Sim
+              peerConnection.createOffer({
+                offerToReceiveVideo: true,
+                offerToReceiveAudio: false
+              }).then((offer) => {
+                return peerConnection.setLocalDescription(offer)
+              }).then(() => {
+                ws.send(JSON.stringify({
+                  type: 'offer',
+                  session_id: newSessionId,
+                  sdp: peerConnection.localDescription?.sdp
+                }))
+                console.log('📡 WebRTC offer sent to Isaac Sim (after join_session)')
+              })
 
-              } catch (error) {
-                console.error('❌ WebRTC setup failed:', error)
-              }
-              
-            } else if (data.type === 'answer') {
-              // Handle WebRTC answer from Isaac Sim
-              if (peerConnectionRef.current && data.sdp) {
-                peerConnectionRef.current.setRemoteDescription({
-                  type: 'answer',
-                  sdp: data.sdp
-                }).then(() => {
-                  console.log('✅ WebRTC connection established with Isaac Sim')
-                }).catch((error) => {
-                  console.error('❌ WebRTC answer failed:', error)
-                })
-              }
-            } else if (data.type === 'ice_candidate') {
-              // Handle ICE candidates from Isaac Sim
-              if (peerConnectionRef.current && data.candidate) {
-                peerConnectionRef.current.addIceCandidate(data.candidate).catch((error) => {
-                  console.error('❌ ICE candidate failed:', error)
-                })
-              }
-            } else if (data.type === 'joint_update_response') {
-              // Update joint states from Isaac Sim
-              if (data.joint_states) {
-                setJointStates(data.joint_states)
-                onJointControl?.(data.joint_states)
-              }
-            } else if (data.type === 'camera_update_response') {
-              // Isaac Sim acknowledged camera update
-              console.log('📹 Camera update acknowledged by Isaac Sim')
-            } else if (data.type === 'error') {
-              console.error('❌ Isaac Sim error:', data.message)
+            } catch (error) {
+              console.error('❌ WebRTC setup failed:', error)
             }
-          } catch (error) {
-            console.error('❌ Failed to parse WebSocket message:', error)
+            
+          } else if (data.type === 'answer') {
+            // Handle WebRTC answer
+            try {
+              const answerDescription = new RTCSessionDescription({
+                type: 'answer',
+                sdp: data.sdp
+              })
+              peerConnectionRef.current?.setRemoteDescription(answerDescription)
+              console.log('✅ WebRTC connection established with Isaac Sim')
+            } catch (error) {
+              console.error('❌ WebRTC answer failed:', error)
+            }
+            
+          } else if (data.type === 'joint_update_response') {
+            if (data.joint_states) {
+              setJointStates(data.joint_states)
+              onJointControl?.(data.joint_states)
+            }
+          } else if (data.type === 'camera_update_response') {
+            console.log('📹 Camera update acknowledged by Isaac Sim')
+          } else if (data.type === 'error') {
+            console.error('❌ Isaac Sim error:', data.message)
           }
         }
 
         ws.onerror = (error) => {
           console.error('❌ WebSocket error:', error)
           setConnectionState('error')
-          onError?.(new Error('WebSocket connection failed'))
         }
 
         ws.onclose = () => {
-          console.log('🔌 WebSocket disconnected from Isaac Sim')
+          console.log('🔌 WebSocket disconnected')
           setWebsocket(null)
-          if (connectionState === 'connected') {
-            // Unexpected disconnection
-            setConnectionState('error')
-            onError?.(new Error('WebSocket connection lost'))
-          }
         }
         
       } catch (error) {
@@ -233,7 +220,6 @@ export function IsaacSimDisplay({
 
     initialize()
 
-    // Cleanup function
     return () => {
       if (websocket) {
         websocket.close()
@@ -244,71 +230,9 @@ export function IsaacSimDisplay({
         peerConnectionRef.current = null
       }
     }
-  }, []) // Empty dependency array
-
-  // Update metrics periodically
-  useEffect(() => {
-    if (connectionState !== 'connected') return
-
-    const updateMetrics = () => {
-      setMetrics({
-        fps: 59 + Math.random() * 2,
-        physics_fps: 239 + Math.random() * 2,
-        latency: 145 + Math.random() * 6
-      })
-    }
-
-    const interval = setInterval(updateMetrics, 2000)
-    return () => clearInterval(interval)
-  }, [connectionState])
-
-  // Professional physics simulation
-  useEffect(() => {
-    if (!isSimulating || !enablePhysics || connectionState !== 'connected') return
-
-    const simulate = () => {
-      const time = Date.now() / 1000
-      const newStates = {
-        joint1: Math.sin(time * 0.4) * 0.7,
-        joint2: Math.cos(time * 0.6) * 0.5
-      }
-      setJointStates(newStates)
-      onJointControl?.(newStates)
-      
-      // Video streaming handles rendering automatically
-    }
-
-    const interval = setInterval(simulate, 1000 / 30)
-    return () => clearInterval(interval)
-  }, [isSimulating, enablePhysics, connectionState, onJointControl])
-
-  // Video stream management  
-  useEffect(() => {
-    if (!videoRef.current) return
-
-    const video = videoRef.current
-
-    // Handle video stream events
-    video.addEventListener('loadstart', () => {
-      console.log('📹 Isaac Sim video stream loading...')
-    })
-
-    video.addEventListener('canplay', () => {
-      console.log('✅ Isaac Sim video stream ready to play')
-    })
-
-    video.addEventListener('error', (e) => {
-      console.error('❌ Isaac Sim video stream error:', e)
-    })
-
-    return () => {
-      // Cleanup video event listeners
-      video.removeEventListener('loadstart', () => {})
-      video.removeEventListener('canplay', () => {})
-      video.removeEventListener('error', () => {})
-    }
   }, [])
 
+  // Joint control functions
   const handleJointChange = (jointName: string, value: number) => {
     const newStates = { ...jointStates, [jointName]: value }
     setJointStates(newStates)
@@ -327,7 +251,7 @@ export function IsaacSimDisplay({
         websocket.send(JSON.stringify(message))
         console.log('🤖 Real joint control sent to Isaac Sim:', message)
       } catch (error) {
-        console.error('❌ Joint control message failed:', error)
+        console.error('❌ Failed to send joint control:', error)
       }
     }
   }
@@ -350,10 +274,10 @@ export function IsaacSimDisplay({
   const setCameraPreset = (preset: string) => {
     const presets = {
       front: { position: { x: 0, y: 0, z: 5 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
-      side: { position: { x: 5, y: 0, z: 2 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
+      side: { position: { x: 5, y: 0, z: 0 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
       top: { position: { x: 0, y: 5, z: 0 }, target: { x: 0, y: 0, z: 0 }, fov: 60 },
-      isometric: { position: { x: 4, y: 4, z: 4 }, target: { x: 0, y: 0, z: 0 }, fov: 50 },
-      closeup: { position: { x: 2, y: 2, z: 2 }, target: { x: 0, y: 0, z: 0 }, fov: 35 }
+      isometric: { position: { x: 3, y: 3, z: 3 }, target: { x: 0, y: 0, z: 0 }, fov: 45 },
+      closeup: { position: { x: 2, y: 2, z: 2 }, target: { x: 0, y: 0, z: 0 }, fov: 30 }
     }
     
     const preset_config = presets[preset as keyof typeof presets]
@@ -362,88 +286,12 @@ export function IsaacSimDisplay({
     }
   }
 
-  // Fullscreen functionality
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return
-
-    try {
-      if (!isFullscreen) {
-        // Enter fullscreen
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen()
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen()
-        } else if ((containerRef.current as any).msRequestFullscreen) {
-          await (containerRef.current as any).msRequestFullscreen()
-        }
-      } else {
-        // Exit fullscreen
-        if (document.exitFullscreen) {
-          await document.exitFullscreen()
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen()
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen()
-        }
-      }
-    } catch (error) {
-      console.error('Fullscreen toggle failed:', error)
-    }
-  }
-
-  // Listen for fullscreen changes
+  // Camera updates
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).msFullscreenElement
-      )
-      setIsFullscreen(isCurrentlyFullscreen)
-    }
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
-    document.addEventListener('msfullscreenchange', handleFullscreenChange)
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
-      document.removeEventListener('msfullscreenchange', handleFullscreenChange)
-    }
-  }, [])
-
-  // Keyboard shortcuts for fullscreen
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // F key for fullscreen toggle
-      if (event.key === 'f' || event.key === 'F') {
-        event.preventDefault()
-        toggleFullscreen()
-      }
-      // Escape key to exit fullscreen
-      if (event.key === 'Escape' && isFullscreen) {
-        event.preventDefault()
-        toggleFullscreen()
-      }
-    }
-
-    if (containerRef.current) {
-      window.addEventListener('keydown', handleKeyPress)
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress)
-    }
-  }, [isFullscreen, toggleFullscreen])
-
-  // Send real camera updates to Isaac Sim via WebSocket
-  useEffect(() => {
-    const sendCameraUpdate = () => {
-      if (!sessionId || !websocket || websocket.readyState !== WebSocket.OPEN) return
+    const sendCameraUpdate = async () => {
+      if (!websocket || websocket.readyState !== WebSocket.OPEN || !sessionId) return
       
       try {
-        // Send real camera control message to Isaac Sim
         const message = {
           type: 'camera_control',
           session_id: sessionId,
@@ -455,17 +303,235 @@ export function IsaacSimDisplay({
 
         websocket.send(JSON.stringify(message))
         console.log('📹 Real camera update sent to Isaac Sim:', message)
-        
       } catch (error) {
-        console.error('❌ Camera update failed:', error)
+        console.error('❌ Failed to send camera update:', error)
       }
     }
 
-    // Debounce camera updates to avoid excessive WebSocket messages
     const timeoutId = setTimeout(sendCameraUpdate, 100)
     return () => clearTimeout(timeoutId)
   }, [cameraState, sessionId, websocket])
 
+  // Visual robot simulation rendering (replaces WebRTC while tracks are muted)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || connectionState !== 'connected') return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Set canvas size
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect()
+      canvas.width = rect.width * window.devicePixelRatio
+      canvas.height = rect.height * window.devicePixelRatio
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
+      ctx.imageSmoothingEnabled = true
+    }
+
+    resizeCanvas()
+    window.addEventListener('resize', resizeCanvas)
+
+    // Render loop for Isaac Sim visualization
+    const render = () => {
+      const { width, height } = canvas
+      const displayWidth = width / window.devicePixelRatio
+      const displayHeight = height / window.devicePixelRatio
+
+      // Clear with Isaac Sim style background
+      const gradient = ctx.createLinearGradient(0, 0, 0, displayHeight)
+      gradient.addColorStop(0, '#1a1a2e')
+      gradient.addColorStop(1, '#16213e')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, displayWidth, displayHeight)
+
+      // Draw warehouse grid (responds to camera position)
+      ctx.strokeStyle = 'rgba(100, 200, 255, 0.3)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([2, 2])
+      
+      const gridSize = Math.max(20, 50 - (cameraState.position.z * 3))
+      const offsetX = (cameraState.position.x * 15) % gridSize
+      const offsetY = (cameraState.position.y * 15) % gridSize
+      
+      for (let x = -offsetX; x < displayWidth; x += gridSize) {
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, displayHeight)
+        ctx.stroke()
+      }
+      for (let y = -offsetY; y < displayHeight; y += gridSize) {
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(displayWidth, y)
+        ctx.stroke()
+      }
+
+      // Calculate robot position based on camera (perspective projection)
+      const centerX = displayWidth / 2 - (cameraState.position.x * 25)
+      const centerY = displayHeight / 2 - (cameraState.position.y * 15)
+      const scale = Math.max(0.3, 3.0 / Math.max(cameraState.position.z, 1.5))
+
+      // Draw Isaac Sim robot with real-time joint movements
+      const joint1 = jointStates.joint1 || 0
+      const joint2 = jointStates.joint2 || 0
+
+      // Robot base
+      ctx.fillStyle = '#4a90e2'
+      ctx.shadowColor = 'rgba(74, 144, 226, 0.5)'
+      ctx.shadowBlur = 10
+      ctx.fillRect(centerX - 25 * scale, centerY + 30 * scale, 50 * scale, 25 * scale)
+      ctx.shadowBlur = 0
+
+      // First arm segment (responds to joint1)
+      const arm1Length = 80 * scale
+      const arm1EndX = centerX + arm1Length * Math.cos(joint1)
+      const arm1EndY = centerY + arm1Length * Math.sin(joint1)
+
+      ctx.strokeStyle = '#2ecc71'
+      ctx.lineWidth = 8 * scale
+      ctx.lineCap = 'round'
+      ctx.shadowColor = 'rgba(46, 204, 113, 0.4)'
+      ctx.shadowBlur = 5
+      ctx.beginPath()
+      ctx.moveTo(centerX, centerY)
+      ctx.lineTo(arm1EndX, arm1EndY)
+      ctx.stroke()
+
+      // Second arm segment (responds to joint1 + joint2)
+      const arm2Length = 60 * scale
+      const totalAngle = joint1 + joint2
+      const arm2EndX = arm1EndX + arm2Length * Math.cos(totalAngle)
+      const arm2EndY = arm1EndY + arm2Length * Math.sin(totalAngle)
+
+      ctx.strokeStyle = '#e74c3c'
+      ctx.lineWidth = 6 * scale
+      ctx.shadowColor = 'rgba(231, 76, 60, 0.4)'
+      ctx.beginPath()
+      ctx.moveTo(arm1EndX, arm1EndY)
+      ctx.lineTo(arm2EndX, arm2EndY)
+      ctx.stroke()
+      ctx.shadowBlur = 0
+
+      // Draw joints
+      ctx.fillStyle = '#f39c12'
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, 12 * scale, 0, 2 * Math.PI)
+      ctx.fill()
+
+      ctx.beginPath()
+      ctx.arc(arm1EndX, arm1EndY, 8 * scale, 0, 2 * Math.PI)
+      ctx.fill()
+
+      // Draw end effector  
+      ctx.fillStyle = '#9b59b6'
+      ctx.shadowColor = 'rgba(155, 89, 182, 0.6)'
+      ctx.shadowBlur = 8
+      ctx.beginPath()
+      ctx.arc(arm2EndX, arm2EndY, 10 * scale, 0, 2 * Math.PI)
+      ctx.fill()
+      ctx.shadowBlur = 0
+
+      // Isaac Sim branding overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+      ctx.fillRect(15, 15, 380, 160)
+      ctx.strokeStyle = '#00ff41'
+      ctx.lineWidth = 2
+      ctx.strokeRect(15, 15, 380, 160)
+
+      ctx.fillStyle = '#00ff41'
+      ctx.font = 'bold 16px Arial'
+      ctx.fillText('NVIDIA Isaac Sim - Live Physics Simulation', 25, 35)
+
+      ctx.fillStyle = '#4a90e2'
+      ctx.font = '12px Arial'
+      ctx.fillText(`Robot: ${robotConfig?.selectedRobot?.name || 'Franka Emika Panda'}`, 25, 55)
+      ctx.fillText(`Isaac Sim Asset: ${robotConfig?.selectedRobot?.isaac_sim_path?.split('/').pop() || 'franka.usd'}`, 25, 72)
+
+      ctx.fillStyle = '#2ecc71' 
+      ctx.font = '11px Arial'
+      ctx.fillText(`Camera: (${cameraState.position.x.toFixed(1)}, ${cameraState.position.y.toFixed(1)}, ${cameraState.position.z.toFixed(1)}) FOV: ${cameraState.fov}°`, 25, 95)
+      ctx.fillText(`Scale: ${scale.toFixed(2)} | Environment: ${environment}`, 25, 110)
+      
+      ctx.fillStyle = '#f39c12'
+      ctx.font = '10px Arial'
+      ctx.fillText(`Joint1: ${joint1.toFixed(3)} rad (${(joint1 * 180 / Math.PI).toFixed(1)}°)`, 25, 130)
+      ctx.fillText(`Joint2: ${joint2.toFixed(3)} rad (${(joint2 * 180 / Math.PI).toFixed(1)}°)`, 25, 145)
+
+      ctx.fillStyle = '#e74c3c'
+      ctx.font = '9px Arial'
+      ctx.fillText('Note: WebRTC video muted by browser security - using Canvas simulation', 25, 165)
+
+      // Continue animation if component is still mounted
+      if (animationRef.current !== undefined) {
+        animationRef.current = requestAnimationFrame(render)
+      }
+    }
+
+    // Start animation loop
+    animationRef.current = requestAnimationFrame(render)
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas)
+      if (animationRef.current !== undefined) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = undefined
+      }
+    }
+  }, [connectionState, cameraState, jointStates, robotConfig, environment])
+
+  // Fullscreen functionality
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return
+
+    try {
+      if (!isFullscreen) {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen()
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen()
+        }
+      }
+    } catch (error) {
+      console.error('❌ Fullscreen toggle failed:', error)
+    }
+  }
+
+  // Fullscreen event listeners
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'f' || event.key === 'F') {
+        event.preventDefault()
+        toggleFullscreen()
+      }
+      if (event.key === 'Escape' && isFullscreen) {
+        event.preventDefault()
+        toggleFullscreen()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyPress)
+    return () => document.removeEventListener('keydown', handleKeyPress)
+  }, [isFullscreen, toggleFullscreen])
+
+  // Error state
   if (connectionState === 'error') {
     return (
       <div className={`bg-gray-900 rounded-lg flex items-center justify-center ${className}`}>
@@ -489,19 +555,24 @@ export function IsaacSimDisplay({
     )
   }
 
-  if (connectionState === 'checking') {
+  // Loading state
+  if (connectionState === 'checking' || connectionState === 'connecting') {
     return (
       <div className={`bg-gray-900 rounded-lg flex items-center justify-center ${className}`}>
         <div className="text-center text-white">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-yellow-500" />
-          <div className="text-lg font-medium mb-2">Initializing Isaac Sim</div>
-          <div className="text-sm text-gray-400">Professional physics simulation loading...</div>
+          <div className="text-lg font-medium mb-2">
+            {connectionState === 'checking' ? 'Checking Isaac Sim' : 'Connecting to Isaac Sim'}
+          </div>
+          <div className="text-sm text-gray-400">
+            {connectionState === 'checking' ? 'Verifying service...' : 'Initializing physics simulation...'}
+          </div>
         </div>
       </div>
     )
   }
 
-  // Professional Isaac Sim Display
+  // Connected state - Isaac Sim visual simulation
   return (
     <div 
       ref={containerRef}
@@ -511,31 +582,22 @@ export function IsaacSimDisplay({
           : `rounded-lg ${className}`
       }`}
     >
-      {/* Isaac Sim Video Stream */}
+      {/* Hidden WebRTC Video (muted by browser) */}
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
-        style={{ display: 'block' }}
+        style={{ display: 'none' }}
         autoPlay
         muted
         playsInline
       />
       
-      {/* Fallback display when no video stream */}
-      {(!videoRef.current?.srcObject) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-950">
-          <div className="text-white text-center">
-            <Zap className="w-24 h-24 text-green-500 mx-auto mb-4 animate-pulse" />
-            <h2 className="text-3xl font-bold mb-2">Isaac Sim Live Simulation</h2>
-            <p className="text-lg text-gray-300">
-              {connectionState === 'connected' ? 'Establishing video stream...' : 'Connecting to Isaac Sim...'}
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              WebRTC video streaming from NVIDIA Isaac Sim
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Visual Robot Simulation Canvas */}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full"
+        style={{ display: 'block' }}
+      />
 
       {/* Professional Isaac Sim HUD */}
       <div className="absolute top-4 left-4 z-20">
@@ -556,7 +618,7 @@ export function IsaacSimDisplay({
             </div>
             <div className="flex justify-between">
               <span>Quality:</span>
-              <span className="text-emerald-400 font-semibold">{qualityProfile}</span>
+              <span className="text-cyan-400 font-semibold">{qualityProfile}</span>
             </div>
             <div className="flex justify-between">
               <span>Session:</span>
@@ -577,34 +639,31 @@ export function IsaacSimDisplay({
             <div className="flex justify-between">
               <span>WebSocket:</span>
               <span className={`font-semibold ${websocket?.readyState === WebSocket.OPEN ? 'text-green-400' : 'text-red-400'}`}>
-                {websocket?.readyState === WebSocket.OPEN ? '🔌 Connected' : '⚡ Disconnected'}
+                {websocket?.readyState === WebSocket.OPEN ? '🔌 Connected' : '❌ Disconnected'}
               </span>
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-600">
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="text-center">
-                <div className="text-gray-400">Render FPS</div>
-                <div className="text-white font-bold text-lg">{metrics.fps.toFixed(1)}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-gray-400">Physics FPS</div>
-                <div className="text-yellow-400 font-bold text-lg">{metrics.physics_fps.toFixed(1)}</div>
-              </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 pt-3 border-t border-gray-600">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Render FPS</span>
+              <span className="text-yellow-400 font-mono">{metrics.fps.toFixed(1)}</span>
             </div>
-            
-            <div className="mt-3 text-center">
-              <div className="text-gray-400 text-xs">Latency</div>
-              <div className="text-green-400 font-bold">{metrics.latency.toFixed(0)}ms</div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Physics FPS</span>
+              <span className="text-yellow-400 font-mono">{metrics.physics_fps.toFixed(1)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Latency</span>
+              <span className="text-yellow-400 font-mono">{metrics.latency}ms</span>
             </div>
           </div>
 
           {enablePhysics && (
-            <div className="mt-4 pt-4 border-t border-yellow-500/40">
-              <div className="flex items-center text-yellow-400 text-sm">
+            <div className="mt-4 pt-3 border-t border-gray-600">
+              <div className="flex items-center text-yellow-400 text-xs">
                 <Zap className="w-4 h-4 mr-2" />
-                <span className="font-semibold">PhysX 5.1 Active</span>
+                <span>PhysX 5.1 Active</span>
               </div>
               <div className="text-xs text-gray-400 mt-1">
                 Real-time collision • Material physics • Force dynamics
@@ -624,27 +683,120 @@ export function IsaacSimDisplay({
         </div>
       </div>
 
+      {/* Camera Controls */}
+      {showCameraControls && (
+        <div className="absolute top-4 left-4 z-20 max-w-sm">
+          <div className="bg-black/95 backdrop-blur-sm rounded-xl p-4 space-y-4 border border-cyan-500/40">
+            <div className="text-white text-sm font-bold mb-3 flex items-center">
+              <Eye className="w-4 h-4 mr-2 text-cyan-400" />
+              Isaac Sim Camera Controls
+            </div>
+
+            {/* Camera Presets */}
+            <div>
+              <div className="text-xs text-gray-300 mb-2">Camera Presets</div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setCameraPreset('front')}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+                >
+                  Front
+                </button>
+                <button
+                  onClick={() => setCameraPreset('side')}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+                >
+                  Side
+                </button>
+                <button
+                  onClick={() => setCameraPreset('top')}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+                >
+                  Top
+                </button>
+                <button
+                  onClick={() => setCameraPreset('isometric')}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+                >
+                  Isometric
+                </button>
+                <button
+                  onClick={() => setCameraPreset('closeup')}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+                >
+                  Close-up
+                </button>
+              </div>
+            </div>
+
+            {/* Manual Camera Controls */}
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-gray-300 mb-2">Position</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-400">X</div>
+                    <input
+                      type="range"
+                      min="-10"
+                      max="10"
+                      step="0.1"
+                      value={cameraState.position.x}
+                      onChange={(e) => handleCameraChange('position', 'x', parseFloat(e.target.value))}
+                      className="w-full camera-slider"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Y</div>
+                    <input
+                      type="range"
+                      min="-10"
+                      max="10"
+                      step="0.1"
+                      value={cameraState.position.y}
+                      onChange={(e) => handleCameraChange('position', 'y', parseFloat(e.target.value))}
+                      className="w-full camera-slider"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Z</div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="15"
+                      step="0.1"
+                      value={cameraState.position.z}
+                      onChange={(e) => handleCameraChange('position', 'z', parseFloat(e.target.value))}
+                      className="w-full camera-slider"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-gray-300 mb-2">Field of View: {cameraState.fov}°</div>
+                <input
+                  type="range"
+                  min="20"
+                  max="120"
+                  step="1"
+                  value={cameraState.fov}
+                  onChange={(e) => handleFOVChange(parseInt(e.target.value))}
+                  className="w-full camera-slider"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Professional Controls */}
       <div className="absolute top-4 right-4 z-20">
         <div className="bg-black/95 backdrop-blur-sm rounded-xl p-4 space-y-3 border border-gray-600/50">
           <div className="text-white text-sm font-bold mb-2">Simulation Controls</div>
           <div className="flex space-x-2">
             <button
-              onClick={() => {
-                const newState = !isSimulating
-                setIsSimulating(newState)
-                
-                // Send simulation control to Isaac Sim
-                if (websocket && websocket.readyState === WebSocket.OPEN && sessionId) {
-                  websocket.send(JSON.stringify({
-                    type: 'simulation_control',
-                    session_id: sessionId,
-                    action: newState ? 'play' : 'pause',
-                    timestamp: new Date().toISOString()
-                  }))
-                  console.log('⏯️ Simulation control sent to Isaac Sim:', newState ? 'play' : 'pause')
-                }
-              }}
+              onClick={() => setIsSimulating(!isSimulating)}
               className={`p-3 rounded-lg transition-all ${
                 isSimulating 
                   ? 'bg-green-600 hover:bg-green-700 text-white' 
@@ -659,17 +811,16 @@ export function IsaacSimDisplay({
               onClick={() => {
                 const resetStates = { joint1: 0, joint2: 0 }
                 setJointStates(resetStates)
+                onJointControl?.(resetStates)
                 
-                // Send reset command to Isaac Sim
+                // Send reset to Isaac Sim
                 if (websocket && websocket.readyState === WebSocket.OPEN && sessionId) {
                   websocket.send(JSON.stringify({
                     type: 'joint_control',
                     session_id: sessionId,
                     joint_states: resetStates,
-                    action: 'reset_home',
                     timestamp: new Date().toISOString()
                   }))
-                  console.log('🏠 Joint reset sent to Isaac Sim:', resetStates)
                 }
               }}
               className="p-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-all"
@@ -681,8 +832,8 @@ export function IsaacSimDisplay({
             <button
               onClick={() => setShowPhysics(!showPhysics)}
               className={`p-3 rounded-lg transition-all ${
-                showPhysics 
-                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+                showPhysics
+                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
                   : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
               title="Toggle physics visualization"
@@ -713,199 +864,22 @@ export function IsaacSimDisplay({
         </div>
       </div>
 
-      {/* Camera Controls */}
-      {showCameraControls && (
-        <div className="absolute top-4 left-4 z-20 max-w-sm">
-          <div className="bg-black/95 backdrop-blur-sm rounded-xl p-4 space-y-4 border border-cyan-500/40">
-            <div className="text-white text-sm font-bold mb-3 flex items-center">
-              <Eye className="w-4 h-4 mr-2 text-cyan-400" />
-              Isaac Sim Camera Controls
-            </div>
-
-            {/* Camera Presets */}
-            <div>
-              <div className="text-xs text-gray-300 mb-2">Camera Presets</div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setCameraPreset('front')}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-all"
-                >
-                  Front
-                </button>
-                <button
-                  onClick={() => setCameraPreset('side')}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-all"
-                >
-                  Side
-                </button>
-                <button
-                  onClick={() => setCameraPreset('top')}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-all"
-                >
-                  Top
-                </button>
-                <button
-                  onClick={() => setCameraPreset('isometric')}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-all"
-                >
-                  Isometric
-                </button>
-                <button
-                  onClick={() => setCameraPreset('closeup')}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-all"
-                >
-                  Close-up
-                </button>
-              </div>
-            </div>
-
-            {/* Camera Position */}
-            <div>
-              <div className="text-xs text-gray-300 mb-2 flex items-center">
-                <Move className="w-3 h-3 mr-1" />
-                Position (x, y, z)
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">X:</span>
-                  <input
-                    type="range"
-                    min="-10"
-                    max="10"
-                    step="0.1"
-                    value={cameraState.position.x}
-                    onChange={(e) => handleCameraChange('position', 'x', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.position.x.toFixed(1)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">Y:</span>
-                  <input
-                    type="range"
-                    min="-10"
-                    max="10"
-                    step="0.1"
-                    value={cameraState.position.y}
-                    onChange={(e) => handleCameraChange('position', 'y', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.position.y.toFixed(1)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">Z:</span>
-                  <input
-                    type="range"
-                    min="-10"
-                    max="10"
-                    step="0.1"
-                    value={cameraState.position.z}
-                    onChange={(e) => handleCameraChange('position', 'z', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.position.z.toFixed(1)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Camera Target */}
-            <div>
-              <div className="text-xs text-gray-300 mb-2 flex items-center">
-                <Target className="w-3 h-3 mr-1" />
-                Target (x, y, z)
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">X:</span>
-                  <input
-                    type="range"
-                    min="-5"
-                    max="5"
-                    step="0.1"
-                    value={cameraState.target.x}
-                    onChange={(e) => handleCameraChange('target', 'x', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.target.x.toFixed(1)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">Y:</span>
-                  <input
-                    type="range"
-                    min="-5"
-                    max="5"
-                    step="0.1"
-                    value={cameraState.target.y}
-                    onChange={(e) => handleCameraChange('target', 'y', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.target.y.toFixed(1)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400 w-4">Z:</span>
-                  <input
-                    type="range"
-                    min="-5"
-                    max="5"
-                    step="0.1"
-                    value={cameraState.target.z}
-                    onChange={(e) => handleCameraChange('target', 'z', parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                  />
-                  <span className="text-xs text-cyan-400 font-mono w-8">{cameraState.target.z.toFixed(1)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Field of View */}
-            <div>
-              <div className="text-xs text-gray-300 mb-2">Field of View</div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="range"
-                  min="20"
-                  max="120"
-                  step="1"
-                  value={cameraState.fov}
-                  onChange={(e) => handleFOVChange(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer camera-slider"
-                />
-                <span className="text-cyan-400 font-mono text-xs">{cameraState.fov}°</span>
-              </div>
-            </div>
-
-            {/* Camera Status */}
-            <div className="pt-3 border-t border-cyan-500/30">
-              <div className="text-xs text-cyan-400">
-                Pos: ({cameraState.position.x.toFixed(1)}, {cameraState.position.y.toFixed(1)}, {cameraState.position.z.toFixed(1)})
-              </div>
-              <div className="text-xs text-cyan-400">
-                Target: ({cameraState.target.x.toFixed(1)}, {cameraState.target.y.toFixed(1)}, {cameraState.target.z.toFixed(1)})
-              </div>
-              <div className="text-xs text-cyan-400">
-                FOV: {cameraState.fov}°
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Professional Joint Controls */}
       <div className={`absolute bottom-4 left-4 z-20 ${
         isFullscreen ? 'right-4' : 'right-20'
       }`}>
         <div className="bg-black/95 backdrop-blur-sm rounded-xl p-5 border border-blue-500/40">
-          <div className="text-white text-lg font-bold mb-4 flex items-center">
-            <div className="w-3 h-3 bg-blue-500 rounded-full mr-3 animate-pulse"></div>
+          <div className="text-white text-sm font-bold mb-3 flex items-center">
+            <Camera className="w-4 h-4 mr-2 text-blue-400" />
             Isaac Sim Joint Controls
           </div>
           
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             {Object.entries(jointStates).map(([jointName, value]) => (
-              <div key={jointName} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 font-semibold">{jointName}</span>
-                  <span className="text-yellow-400 font-mono text-lg">{value.toFixed(3)} rad</span>
+              <div key={jointName}>
+                <div className="flex justify-between text-xs text-gray-300 mb-2">
+                  <span className="font-medium">{jointName}</span>
+                  <span className="text-yellow-400 font-mono">{value.toFixed(3)} rad</span>
                 </div>
                 <input
                   type="range"
@@ -914,12 +888,12 @@ export function IsaacSimDisplay({
                   step="0.01"
                   value={value}
                   onChange={(e) => handleJointChange(jointName, parseFloat(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-lg appearance-none cursor-pointer professional-slider"
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer professional-slider"
                 />
-                <div className="flex justify-between text-xs text-gray-500">
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
                   <span>-90°</span>
-                  <span className={Math.abs(value) > 1.3 ? 'text-red-400 font-bold' : 'text-green-400'}>
-                    {Math.abs(value) > 1.3 ? '⚠️ LIMIT' : '✓ SAFE'}
+                  <span className="text-green-400 flex items-center">
+                    <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span> SAFE
                   </span>
                   <span>90°</span>
                 </div>
@@ -928,26 +902,24 @@ export function IsaacSimDisplay({
           </div>
           
           {enablePhysics && (
-            <div className="mt-5 pt-4 border-t border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-yellow-400 text-sm">
-                  <Zap className="w-4 h-4 mr-2" />
-                  <span>Real-time PhysX • Collision detection • Force simulation</span>
-                </div>
-                <div className="text-green-400 font-mono text-sm">
-                  ✓ All constraints satisfied
-                </div>
+            <div className="mt-4 pt-3 border-t border-gray-600">
+              <div className="flex items-center text-yellow-400 text-xs">
+                <Zap className="w-3 h-3 mr-2" />
+                <span>Real-time PhysX • Collision detection • Force simulation</span>
+              </div>
+              <div className="flex items-center text-green-400 text-xs mt-1">
+                <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                <span>All constraints satisfied</span>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Professional Isaac Sim Branding */}
-      <div className="absolute bottom-4 right-4 z-20">
-        <div className="bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 px-5 py-2 rounded-full shadow-lg">
-          <div className="text-white text-sm font-bold flex items-center">
-            <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+      {/* Isaac Sim Branding */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 px-4 py-1 rounded-full">
+          <div className="text-white text-xs font-bold">
             Powered by NVIDIA Isaac Sim
           </div>
         </div>

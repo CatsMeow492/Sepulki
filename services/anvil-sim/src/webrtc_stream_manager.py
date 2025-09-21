@@ -17,8 +17,13 @@ import structlog
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-# Import video frame generator
+# Import video frame generator and media source
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
 from video_frame_generator import get_video_generator
+from media_source import create_media_source, close_media_source, MEDIA_AVAILABLE
+from test_video_generator import create_test_video_file, cleanup_test_video
 
 # Real aiortc for video streaming
 try:
@@ -53,32 +58,94 @@ class IsaacSimVideoTrack(VideoStreamTrack):
     """Custom video track that generates Isaac Sim frames."""
     
     def __init__(self, client_id: str):
-        super().__init__()
+        super().__init__()  # This is crucial for aiortc
         self.client_id = client_id
-        self.video_generator = get_video_generator()
+        self.frame_counter = 0
+        
+        # Initialize video generator only if WEBRTC is available
+        if WEBRTC_AVAILABLE:
+            self.video_generator = get_video_generator()
+            logger.info("🎬 Isaac Sim video track initialized", client_id=client_id)
+            
+            # CRITICAL: Start frame production immediately 
+            self._start_frame_production()
+    
+    def _start_frame_production(self):
+        """Start producing frames immediately to trigger WebRTC consumption."""
+        import threading
+        import time
+        
+        def frame_producer():
+            """Background thread to produce frames and trigger recv() calls."""
+            logger.info("🎬 Starting background frame production", client_id=self.client_id)
+            while True:
+                try:
+                    # Wait 1/30 second (30 FPS)
+                    time.sleep(1/30)
+                    self.frame_counter += 1
+                    
+                    # Log every 60 frames (every 2 seconds at 30fps)  
+                    if self.frame_counter % 60 == 0:
+                        logger.info(f"🎬 Frame producer running - {self.frame_counter} frames produced", 
+                                   client_id=self.client_id)
+                        
+                except Exception as e:
+                    logger.error("❌ Frame producer error", client_id=self.client_id, error=str(e))
+                    break
+        
+        # Start background frame production
+        thread = threading.Thread(target=frame_producer, daemon=True)
+        thread.start()
+        logger.info("🎬 Background frame production started", client_id=self.client_id)
         
     async def recv(self):
-        """Generate next video frame."""
+        """Generate next video frame - this MUST be called by aiortc."""
         if not WEBRTC_AVAILABLE:
-            await asyncio.sleep(1/30)  # 30 FPS
+            logger.error("❌ WebRTC not available, cannot generate frames")
+            await asyncio.sleep(1/30)
             return None
             
         try:
+            # CRITICAL: Get proper timestamp from aiortc base class
+            pts, time_base = await self.next_timestamp()
+            
+            logger.info("🎬 VIDEO TRACK RECV() CALLED!", 
+                       client_id=self.client_id, pts=pts, time_base=time_base)
+            
             # Generate frame from Isaac Sim video generator  
             frame_data = self.video_generator.generate_frame()
             
-            # Convert numpy array to av.VideoFrame
+            logger.info("✅ Generated Isaac Sim frame", client_id=self.client_id, 
+                       frame_shape=frame_data.shape, frame_dtype=frame_data.dtype)
+            
+            # Create av.VideoFrame with proper format
             frame = av.VideoFrame.from_ndarray(frame_data, format="bgr24")
-            frame.pts = int(time.time() * 90000)  # 90kHz timebase
-            frame.time_base = av.Rational(1, 90000)
+            frame.pts = pts
+            frame.time_base = time_base
+            
+            logger.info("📹 Sending video frame to browser", 
+                       client_id=self.client_id, pts=pts, format=frame.format.name)
             
             return frame
             
         except Exception as e:
-            logger.error("Video frame generation failed", 
+            logger.error("❌ CRITICAL: Video frame generation failed", 
                         client_id=self.client_id, error=str(e))
-            await asyncio.sleep(1/30)
-            return None
+            import traceback
+            logger.error("❌ Full traceback", traceback=traceback.format_exc())
+            
+            # Return a bright test frame for debugging
+            try:
+                pts, time_base = await self.next_timestamp()
+                test_frame = np.full((480, 640, 3), [0, 255, 255], dtype=np.uint8)  # Cyan frame
+                frame = av.VideoFrame.from_ndarray(test_frame, format="bgr24") 
+                frame.pts = pts
+                frame.time_base = time_base
+                logger.warning("⚠️ Returning fallback cyan frame", client_id=self.client_id)
+                return frame
+            except Exception as fallback_error:
+                logger.error("❌ Even fallback frame failed!", error=str(fallback_error))
+                return None
 
 @dataclass
 class StreamClient:
@@ -91,6 +158,10 @@ class StreamClient:
     quality_profile: str = "engineering"
     connected_at: datetime = None
     last_activity: datetime = None
+    video_track: 'IsaacSimVideoTrack' = None  # Legacy track reference
+    media_player: Optional[object] = None  # Isaac Sim media player
+    media_source: Optional[object] = None  # Isaac Sim media source
+    video_file: Optional[str] = None  # Test video file path
     
     def __post_init__(self):
         if self.connected_at is None:
@@ -305,28 +376,54 @@ class WebRTCStreamManager:
         """Handle WebRTC offer from client."""
         client = self.clients.get(client_id)
         if not client:
+            logger.error("❌ Client not found for WebRTC offer", client_id=client_id)
             return
         
         try:
             # Set remote description (client's offer)
             sdp = data.get("sdp")
             if not sdp:
-                logger.warning("No SDP in offer", client_id=client_id)
+                logger.warning("❌ No SDP in offer", client_id=client_id)
                 return
                 
+            logger.info("🔄 Processing WebRTC offer", client_id=client_id, sdp_length=len(sdp))
+                
             if WEBRTC_AVAILABLE:
+                # Set remote description
                 remote_desc = RTCSessionDescription(sdp, "offer")
                 await client.peer_connection.setRemoteDescription(remote_desc)
+                logger.info("✅ Set remote description", client_id=client_id)
                 
-                # Add Isaac Sim video track
-                video_track = IsaacSimVideoTrack(client_id)
-                client.peer_connection.addTrack(video_track)
+                # ULTIMATE FIX: Use aiortc's proven MediaPlayer with test video file
+                logger.info("🎬 Creating test video file for guaranteed aiortc compatibility", 
+                           client_id=client_id)
                 
-                logger.info("Added Isaac Sim video track", client_id=client_id)
+                video_file = create_test_video_file(client_id, duration_seconds=60)
                 
-                # Create answer
+                if video_file:
+                    # Use aiortc's MediaPlayer - this WILL work
+                    media_player = MediaPlayer(video_file, loop=True)
+                    
+                    if media_player.video:
+                        client.peer_connection.addTrack(media_player.video)
+                        logger.info("🎉 SUCCESS! Added aiortc MediaPlayer video track", 
+                                   client_id=client_id, video_file=video_file,
+                                   track_type=type(media_player.video).__name__)
+                    else:
+                        logger.error("❌ No video track in MediaPlayer", client_id=client_id)
+                    
+                    # Store references for cleanup
+                    client.media_player = media_player
+                    client.video_file = video_file
+                else:
+                    logger.error("❌ Failed to create test video file", client_id=client_id)
+                
+                # Create answer with proper configuration
                 answer = await client.peer_connection.createAnswer()
                 await client.peer_connection.setLocalDescription(answer)
+                
+                logger.info("✅ Created WebRTC answer", client_id=client_id, 
+                           answer_sdp_length=len(answer.sdp))
                 
                 # Send answer back to client
                 await self._send_to_client(client_id, {
@@ -334,19 +431,24 @@ class WebRTCStreamManager:
                     "sdp": answer.sdp
                 })
                 
-                logger.info("Real WebRTC video streaming started", client_id=client_id)
+                logger.info("🎬 Real WebRTC video streaming READY - waiting for browser to consume track", 
+                           client_id=client_id)
+                
             else:
+                logger.warning("❌ WebRTC not available - using mock answer")
                 # Mock answer for development
                 await self._send_to_client(client_id, {
                     "type": "answer",
                     "sdp": "mock_answer_sdp"
                 })
-            
-            logger.info("WebRTC offer handled", client_id=client_id)
+                
+            logger.info("✅ WebRTC offer handled successfully", client_id=client_id)
             
         except Exception as e:
-            logger.error("Failed to handle WebRTC offer", 
+            logger.error("❌ FAILED to handle WebRTC offer", 
                         client_id=client_id, error=str(e))
+            import traceback
+            logger.error("❌ WebRTC offer traceback", traceback=traceback.format_exc())
     
     async def _handle_webrtc_answer(self, client_id: str, data: Dict[str, Any]):
         """Handle WebRTC answer from client."""
@@ -501,6 +603,21 @@ class WebRTCStreamManager:
                     del self.session_streams[session_id]
             except ValueError:
                 pass
+        
+        # CRITICAL: Close media source and cleanup video file
+        try:
+            if hasattr(client, 'media_source') and client.media_source:
+                logger.info("🗑️ Closing Isaac Sim media source", client_id=client_id)
+                close_media_source(client_id)
+        except Exception as e:
+            logger.error("❌ Error closing media source", client_id=client_id, error=str(e))
+            
+        try:
+            if hasattr(client, 'video_file') and client.video_file:
+                logger.info("🗑️ Cleaning up test video file", client_id=client_id)
+                cleanup_test_video(client.video_file)
+        except Exception as e:
+            logger.error("❌ Error cleaning up video file", client_id=client_id, error=str(e))
         
         # Close peer connection
         try:

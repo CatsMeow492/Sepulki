@@ -11,6 +11,7 @@ import { suggestPresetFromAnalysis } from '@/lib/presets';
 import { fetchCatalog, selectFromCatalog } from '@/lib/catalog';
 import { SaveDesignModal } from '@/components/SaveDesignModal';
 import { useAuth } from '@/components/AuthProvider';
+import { extractRobotRecommendations, generateIsaacSimConfiguration, type IsaacSimRobot } from '@/lib/openai';
 
 // Dynamically import the Isaac Sim Display with SSR disabled
 const IsaacSimDisplay = dynamic(
@@ -60,6 +61,9 @@ function ConfigureContent() {
   const [builtUrdf, setBuiltUrdf] = useState<string | undefined>(undefined);
   const [preset, setPreset] = useState<string>('sample-arm')
   const [jointSnapshot, setJointSnapshot] = useState<{ name: string; value: number; min?: number; max?: number }[]>([]);
+  const [recommendedRobots, setRecommendedRobots] = useState<IsaacSimRobot[]>([]);
+  const [selectedRobot, setSelectedRobot] = useState<IsaacSimRobot | null>(null);
+  const [isaacSimConfig, setIsaacSimConfig] = useState<any>(null);
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
   const [seek, setSeek] = useState<number | undefined>(undefined)
@@ -92,6 +96,22 @@ function ConfigureContent() {
 
     setAnalysis(storedAnalysis);
     setUserInput(storedInput);
+    
+    // Extract Isaac Sim robot recommendations from analysis
+    const robots = extractRobotRecommendations(storedAnalysis);
+    setRecommendedRobots(robots);
+    
+    // Select the first recommended robot as default
+    if (robots.length > 0) {
+      setSelectedRobot(robots[0]);
+      
+      // Generate Isaac Sim configuration
+      const config = generateIsaacSimConfiguration(robots, storedInput);
+      setIsaacSimConfig(config);
+      
+      console.log('🤖 Isaac Sim robot recommendations:', robots.map(r => r.name));
+      console.log('🏭 Isaac Sim configuration:', config);
+    }
   }, [searchParams, router]);
 
   const loadSample = () => {
@@ -256,10 +276,76 @@ function ConfigureContent() {
             </div>
           </div>
 
-          {/* Suggested Components (catalog-driven) */}
+          {/* Isaac Sim Robot Recommendations */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Suggested Components</h2>
-            <SuggestedComponents analysis={analysis} userInput={userInput} />
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Isaac Sim Robot Recommendations</h2>
+            
+            {recommendedRobots.length > 0 ? (
+              <div className="space-y-4">
+                {recommendedRobots.map((robot) => (
+                  <div 
+                    key={robot.id}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      selectedRobot?.id === robot.id 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedRobot(robot)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="text-2xl">🤖</div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">{robot.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{robot.manufacturer} • {robot.category}</p>
+                        <p className="text-sm text-gray-700 mb-3">{robot.description}</p>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <span className="font-medium text-gray-500">Payload:</span>
+                            <span className="ml-1 text-gray-900">{robot.specifications.payload_kg}kg</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">Reach:</span>
+                            <span className="ml-1 text-gray-900">{robot.specifications.reach_m}m</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">DOF:</span>
+                            <span className="ml-1 text-gray-900">{robot.specifications.dof}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-500">Precision:</span>
+                            <span className="ml-1 text-gray-900">±{robot.specifications.repeatability_mm}mm</span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {robot.use_cases.slice(0, 3).map((useCase) => (
+                            <span key={useCase} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                              {useCase.replace('_', ' ')}
+                            </span>
+                          ))}
+                        </div>
+                        
+                        {selectedRobot?.id === robot.id && (
+                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                            <div className="text-sm font-medium text-green-800">✅ Selected for Isaac Sim</div>
+                            <div className="text-xs text-green-600 mt-1">
+                              Will be loaded: {robot.isaac_sim_path}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">🤖</div>
+                <div>No robot recommendations found</div>
+                <div className="text-sm">Try analyzing requirements first</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -268,11 +354,17 @@ function ConfigureContent() {
           <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden relative">
             <IsaacSimDisplay
               spec={builtSpec}
-              urdf={builtUrdf}
-              environment="warehouse"
+              urdf={selectedRobot?.urdf_path || builtUrdf}
+              environment={isaacSimConfig?.environment || "warehouse"}
               qualityProfile="engineering"
               enablePhysics={true}
               userId={smith?.email || 'anonymous'}
+              robotConfig={{
+                selectedRobot: selectedRobot,
+                isaacSimPath: selectedRobot?.isaac_sim_path,
+                robotName: selectedRobot?.name,
+                physicsConfig: isaacSimConfig?.physics_config
+              }}
               onJointControl={(jointStates) => {
                 // Update joint display when Isaac Sim controls change
                 const snapshot = Object.entries(jointStates).map(([name, value]) => ({
