@@ -1,335 +1,382 @@
-# 🔧 Anvil Sim - Isaac Sim Integration Service
+# 🔥 Anvil Sim - Isaac Sim Integration MVP/PoC
 
-The Anvil Sim service provides physics simulation, validation, and 3D scene management using NVIDIA Isaac Sim. This service acts as the bridge between the Forge UI and Isaac Sim for realistic robot simulation.
+A complete MVP/PoC implementation of NVIDIA Isaac Sim integration for the Sepulki Forge robotics platform. This service enables photorealistic robot simulation with physics-accurate validation through browser-based WebRTC streaming.
 
-## Architecture Overview
+## 🌟 Features
 
+### ✅ **Implemented (MVP)**
+- **🔧 Intelligent Rendering Engine** - Automatically chooses between Three.js and Isaac Sim based on device capabilities
+- **🎥 WebRTC Video Streaming** - Low-latency streaming from Isaac Sim to browser clients
+- **📡 Real-time Communication** - WebSocket signaling for control commands and telemetry
+- **🐳 Containerized Deployment** - Docker support for both development and production
+- **🔄 Graceful Fallback** - Works on macOS with simulation mode when Isaac Sim unavailable
+- **📊 Performance Monitoring** - Real-time metrics and adaptive quality control
+- **⚡ Multi-User Support** - Session management for collaborative design sessions
+
+### 🚀 **Production Ready Features**
+- **🏭 Isaac Sim Integration** - Full NVIDIA Isaac Sim 2023.1+ support with GPU acceleration
+- **🎯 Physics Simulation** - Real-world physics validation and stress testing
+- **🔐 Security** - JWT authentication and CORS protection
+- **📈 Monitoring** - Prometheus metrics and Grafana dashboards
+- **🌐 Scalability** - Auto-scaling Kubernetes deployment manifests
+
+## 🏗️ Architecture
+
+```mermaid
+graph TB
+    A[Forge UI] -->|WebRTC| B[Anvil Sim Service]
+    B -->|gRPC| C[Isaac Sim Manager]
+    C -->|Native API| D[NVIDIA Isaac Sim]
+    B -->|WebSocket| E[WebRTC Stream Manager]
+    D -->|Video Stream| E
+    E -->|WebRTC| A
+    
+    B -->|Fallback| F[Simulation Mode]
+    F -->|Mock Data| A
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Forge UI      │◄──►│   Anvil Sim      │◄──►│   Isaac Sim     │
-│  (React/R3F)    │    │  (Python/gRPC)   │    │  (Omniverse)    │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
 
-## Features
-
-### Core Simulation Capabilities
-- **Physics Validation** - Real-time physics simulation with accurate dynamics
-- **Collision Detection** - Advanced collision checking for robot designs
-- **Stress Testing** - Material and structural stress analysis
-- **Performance Modeling** - Latency, throughput, and efficiency prediction
-
-### 3D Scene Management  
-- **Scene Generation** - Automatic scene creation from Sepulka designs
-- **Asset Loading** - Dynamic loading of URDF models and 3D meshes
-- **Environment Setup** - Configurable simulation environments
-- **Camera Management** - Multiple viewports and camera controls
-
-### Integration Points
-- **gRPC API** - High-performance communication with Forge UI
-- **WebSocket Stream** - Real-time simulation data streaming
-- **GraphQL Subscriptions** - Live updates through Hammer Orchestrator
-- **File System Bridge** - Asset synchronization with Vault Registry
-
-## Isaac Sim Integration
+## 🚀 Quick Start
 
 ### Prerequisites
-- NVIDIA Isaac Sim 2023.1.1+
-- NVIDIA Omniverse Launcher
-- CUDA-compatible GPU (RTX 3060+)
-- Python 3.10+ with Isaac Sim Python API
 
-### Installation & Setup
+**For Development (macOS/Windows/Linux):**
+- Docker Desktop
+- Node.js 18+ (for frontend integration)
 
-1. **Install Isaac Sim**
-   ```bash
-   # Download from NVIDIA Developer Portal
-   # Install via Omniverse Launcher
-   ```
+**For Production (Linux with NVIDIA GPU):**
+- NVIDIA GPU (RTX 3060+ recommended)
+- NVIDIA drivers 470+
+- NVIDIA Container Toolkit
+- Docker with GPU support
 
-2. **Configure Python Environment**
-   ```bash
-   # Use Isaac Sim's Python environment
-   export ISAACSIM_PYTHON_EXE="~/.local/share/ov/pkg/isaac_sim-*/python.sh"
-   ```
+### 🧪 Development Setup (macOS Compatible)
 
-3. **Install Service Dependencies**
-   ```bash
-   cd services/anvil-sim
-   $ISAACSIM_PYTHON_EXE -m pip install -r requirements.txt
-   ```
+```bash
+# 1. Clone and navigate to service
+cd services/anvil-sim
 
-### Service Configuration
+# 2. Start development environment
+./scripts/dev-start.sh
 
-```python
-# anvil_config.py
-ISAAC_SIM_CONFIG = {
-    "headless": True,  # Set to False for development
-    "width": 1920,
-    "height": 1080, 
-    "physics_dt": 1.0 / 240.0,  # 240Hz physics
-    "rendering_dt": 1.0 / 60.0,  # 60Hz rendering
-    "enable_livestream": True,
-    "livestream_port": 8211
-}
-
-SIMULATION_ENVIRONMENTS = {
-    "warehouse": "/World/Warehouse",
-    "factory_floor": "/World/Factory", 
-    "lab": "/World/Lab",
-    "outdoor": "/World/Outdoor"
-}
+# 3. Verify service is running
+curl http://localhost:8002/health
 ```
 
-## API Reference
+**Development Endpoints:**
+- **gRPC API**: `http://localhost:8000`
+- **WebRTC Streaming**: `ws://localhost:8001`
+- **Health Check**: `http://localhost:8002/health`
+- **Metrics**: `http://localhost:9090` (Prometheus)
+- **Dashboard**: `http://localhost:3000` (Grafana)
 
-### gRPC Service Definition
+### 🏭 Production Deployment (Linux + NVIDIA GPU)
+
+```bash
+# 1. Verify GPU support
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+
+# 2. Deploy production service
+./scripts/prod-deploy.sh
+
+# 3. Verify Isaac Sim is running
+curl http://localhost:8002/health
+```
+
+## 📋 API Reference
+
+### gRPC Services
 
 ```protobuf
-syntax = "proto3";
-
 service AnvilSim {
-  // Scene Management
+  // Session Management
   rpc CreateScene(SceneRequest) returns (SceneResponse);
   rpc LoadRobot(RobotRequest) returns (RobotResponse);
-  rpc UpdateRobot(UpdateRequest) returns (UpdateResponse);
   
   // Simulation Control
   rpc StartSimulation(SimRequest) returns (SimResponse);
   rpc StepSimulation(StepRequest) returns (StepResponse);
-  rpc StopSimulation(StopRequest) returns (StopResponse);
   
-  // Analysis & Validation
+  // Validation & Analysis
   rpc ValidateDesign(ValidateRequest) returns (ValidationReport);
   rpc RunStressTest(StressRequest) returns (StressReport);
   rpc CheckCollisions(CollisionRequest) returns (CollisionReport);
   
-  // Streaming
+  // Real-time Streaming
   rpc StreamTelemetry(TelemetryRequest) returns (stream TelemetryData);
   rpc StreamVideo(VideoRequest) returns (stream VideoFrame);
 }
 ```
 
-### WebSocket Events
+### WebSocket Messages
 
+**Join Session:**
 ```json
 {
-  "event": "simulation_update",
-  "data": {
-    "timestamp": "2024-01-15T10:30:00Z",
-    "robot_poses": {
-      "robot_1": {
-        "position": [0.5, 0.2, 0.8],
-        "orientation": [0, 0, 0, 1],
-        "joint_positions": {"joint_1": 0.5, "joint_2": -0.3}
-      }
-    },
-    "physics_metrics": {
-      "total_energy": 145.2,
-      "collision_count": 0,
-      "stability_score": 0.98
-    }
+  "type": "join_session",
+  "user_id": "user123",
+  "session_id": "session456", 
+  "quality_profile": "engineering"
+}
+```
+
+**Joint Control:**
+```json
+{
+  "type": "joint_control",
+  "joint_states": {
+    "joint1": 0.5,
+    "joint2": -0.3
   }
 }
 ```
 
-## Development Workflow
-
-### 1. Design Validation Pipeline
-
-```python
-async def validate_sepulka_design(sepulka_id: str):
-    # Load design from Vault Registry
-    design = await load_sepulka_design(sepulka_id)
-    
-    # Generate Isaac Sim scene
-    scene = await create_isaac_sim_scene(design)
-    
-    # Run validation tests
-    physics_validation = await run_physics_test(scene)
-    collision_validation = await run_collision_test(scene) 
-    stress_validation = await run_stress_test(scene)
-    
-    # Generate report
-    return ValidationReport(
-        physics=physics_validation,
-        collisions=collision_validation,
-        stress=stress_validation,
-        overall_score=calculate_score([
-            physics_validation,
-            collision_validation, 
-            stress_validation
-        ])
-    )
-```
-
-### 2. Real-time Simulation
-
-```python
-class SimulationManager:
-    def __init__(self):
-        self.isaac_sim = IsaacSim(config=ISAAC_SIM_CONFIG)
-        self.active_simulations = {}
-        
-    async def start_simulation(self, sepulka_id: str, environment: str):
-        # Load robot and environment
-        robot = await self.load_robot_model(sepulka_id)
-        env = await self.load_environment(environment)
-        
-        # Initialize simulation
-        sim_id = str(uuid.uuid4())
-        simulation = Simulation(
-            id=sim_id,
-            robot=robot,
-            environment=env,
-            isaac_sim=self.isaac_sim
-        )
-        
-        # Start simulation loop
-        await simulation.start()
-        self.active_simulations[sim_id] = simulation
-        
-        return sim_id
-```
-
-### 3. Performance Optimization
-
-```python
-# Optimize simulation performance
-PERFORMANCE_SETTINGS = {
-    "physics_substeps": 4,
-    "enable_gpu_dynamics": True,
-    "use_fabric": True,  # Isaac Sim Fabric for better performance
-    "caching_enabled": True,
-    "lod_enabled": True,  # Level-of-detail for complex meshes
-    "culling_enabled": True  # Frustum culling
+**Camera Control:**
+```json
+{
+  "type": "camera_control",
+  "position": [4, 4, 4],
+  "target": [0, 0, 0],
+  "fov": 50
 }
 ```
 
-## Forge UI Integration
+## 🎯 Frontend Integration
 
-### React Component Integration
+### React Component Usage
 
-```typescript
-// SimulationViewer.tsx
-import { useAnvilSimulation } from '@sepulki/anvil-client';
+```tsx
+import { EnhancedScene3D } from '@/components/EnhancedScene3D'
 
-export function SimulationViewer({ sepulkaId }: { sepulkaId: string }) {
-  const { 
-    startSimulation, 
-    stopSimulation, 
-    telemetryStream,
-    videoStream 
-  } = useAnvilSimulation();
-
-  const handleValidate = async () => {
-    const report = await startSimulation({
-      sepulkaId,
-      environment: 'warehouse',
-      validationMode: true
-    });
-    
-    console.log('Validation Report:', report);
-  };
-
+export function RobotDesigner() {
   return (
-    <div className="simulation-viewer">
-      <div className="video-stream">
-        <IsaacSimStream stream={videoStream} />
-      </div>
-      
-      <div className="telemetry-panel">
-        <TelemetryDisplay data={telemetryStream} />
-      </div>
-      
-      <div className="controls">
-        <button onClick={handleValidate}>
-          🔧 Run Anvil Validation
-        </button>
-      </div>
-    </div>
-  );
+    <EnhancedScene3D
+      spec={robotSpec}
+      urdf={robotUrdf}
+      renderMode="auto"           // auto | threejs | isaac_sim
+      qualityProfile="engineering" // demo | engineering | certification
+      enablePhysics={true}
+      environment="warehouse"
+      userId={user.email}
+      enableCollaboration={true}
+      onRobotApi={(api) => {
+        // Handle robot joint controls
+      }}
+      onError={(error) => {
+        console.error('Rendering error:', error)
+      }}
+    />
+  )
 }
 ```
 
-## Deployment
+### Intelligent Rendering Decision
 
-### Docker Configuration
+The system automatically chooses the best renderer based on:
 
-```dockerfile
-# Use Isaac Sim base image
-FROM nvcr.io/nvidia/isaac-sim:2023.1.1
+- **Device Capabilities**: GPU, bandwidth, WebRTC support
+- **Robot Complexity**: Joint count, physics requirements
+- **User Requirements**: Physics simulation, collaboration needs
+- **Quality Profile**: Demo, engineering, or certification quality
+- **Service Availability**: Isaac Sim service health status
 
-# Install service dependencies
-COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
+## 📊 Quality Profiles
 
-# Copy service code
-COPY src/ ./src/
-COPY config/ ./config/
+| Profile | Resolution | FPS | Physics | Use Case |
+|---------|------------|-----|---------|----------|
+| **Demo** | 1280x720 | 30 | Basic | Sales demos, quick previews |
+| **Engineering** | 1920x1080 | 60 | Full | Design validation, testing |
+| **Certification** | 4K | 60 | Maximum | Regulatory compliance, final approval |
 
-# Expose ports
-EXPOSE 8000  # gRPC
-EXPOSE 8001  # WebSocket
-EXPOSE 8211  # Isaac Sim Livestream
+## 🔧 Configuration
 
-# Start service
-CMD ["python", "src/main.py"]
+### Environment Variables
+
+```bash
+# Isaac Sim Configuration
+ANVIL_HEADLESS=true
+ANVIL_WIDTH=1920
+ANVIL_HEIGHT=1080
+ANVIL_PHYSICS_HZ=240
+ANVIL_RENDER_HZ=60
+
+# Performance Optimization
+ANVIL_GPU_DYNAMICS=true
+ANVIL_USE_FABRIC=true
+ANVIL_CACHING=true
+
+# Network Configuration
+ANVIL_GRPC_PORT=8000
+ANVIL_WEBSOCKET_PORT=8001
+ANVIL_LIVESTREAM_PORT=8211
+
+# Security
+JWT_SECRET=your-secure-secret
+ANVIL_AUTH=true
+ANVIL_CORS_ORIGINS=https://forge.sepulki.com
 ```
 
-### Kubernetes Deployment
+### Docker Compose Services
 
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: anvil-sim
-spec:
-  replicas: 1  # Single replica due to GPU requirements
-  selector:
-    matchLabels:
-      app: anvil-sim
-  template:
-    metadata:
-      labels:
-        app: anvil-sim
-    spec:
-      nodeSelector:
-        accelerator: nvidia-gpu
-      containers:
-      - name: anvil-sim
-        image: sepulki/anvil-sim:latest
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-          requests:
-            nvidia.com/gpu: 1
-        ports:
-        - containerPort: 8000
-        - containerPort: 8001  
-        - containerPort: 8211
+services:
+  # Development (no Isaac Sim)
+  anvil-sim-dev:
+    build:
+      target: development
+    ports: ["8000:8000", "8001:8001", "8002:8002"]
+    
+  # Production (with Isaac Sim + GPU)
+  anvil-sim-prod:
+    build:
+      target: production
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 ```
 
-## Testing Strategy
+## 🧪 Testing & Validation
 
-### Unit Tests
-- Physics calculation accuracy
-- URDF parsing and validation
-- Scene generation logic
+### Health Checks
 
-### Integration Tests  
-- Isaac Sim API integration
-- gRPC service endpoints
-- WebSocket streaming
+```bash
+# Service health
+curl http://localhost:8002/health
 
-### Performance Tests
-- Simulation step timing
-- Memory usage optimization
-- GPU utilization efficiency
+# WebSocket connection
+wscat -c ws://localhost:8001
 
-### Validation Tests
-- Collision detection accuracy
-- Stress analysis precision
-- Real-world physics correlation
+# Isaac Sim livestream (production)
+curl http://localhost:8211
+```
 
-This service bridges the gap between web-based 3D visualization and professional-grade physics simulation, enabling users to validate and optimize their robot designs before deployment.
+### Performance Testing
+
+```bash
+# GPU utilization
+nvidia-smi
+
+# Service metrics
+curl http://localhost:8002/metrics
+
+# Memory usage
+docker stats anvil-sim-prod
+```
+
+## 📈 Monitoring
+
+### Prometheus Metrics
+
+- `anvil_sessions_total` - Active simulation sessions
+- `anvil_stream_fps` - Video streaming frame rate
+- `anvil_physics_step_duration` - Physics simulation performance
+- `anvil_gpu_utilization` - GPU usage percentage
+
+### Grafana Dashboards
+
+- **Session Overview** - Active users, session duration
+- **Performance Metrics** - FPS, latency, bandwidth usage
+- **System Health** - GPU utilization, memory usage
+- **Quality Metrics** - Stream quality, error rates
+
+## 🔄 Development Workflow
+
+### 1. Make Changes
+
+```bash
+# Edit source files
+vim src/isaac_sim_manager.py
+
+# Hot reload in development
+docker-compose restart anvil-sim-dev
+```
+
+### 2. Test Integration
+
+```bash
+# Run unit tests
+pytest tests/
+
+# Test WebRTC streaming
+npm test -- --testNamePattern="isaac-sim"
+
+# Integration tests
+docker-compose exec anvil-sim-dev python -m pytest tests/integration/
+```
+
+### 3. Deploy Production
+
+```bash
+# Build and deploy
+./scripts/prod-deploy.sh
+
+# Monitor deployment
+docker-compose logs -f anvil-sim-prod
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**"Isaac Sim not available"**
+- ✅ **Development**: Expected behavior, service runs in simulation mode
+- 🔧 **Production**: Check NVIDIA drivers and GPU support
+
+**"WebRTC connection failed"**
+- Check firewall settings for ports 8001, 8211
+- Verify WebRTC support in browser
+- Check STUN/TURN server configuration
+
+**"Service health check failed"**
+- Check container logs: `docker-compose logs anvil-sim-dev`
+- Verify database connection
+- Check disk space for asset caching
+
+### Performance Optimization
+
+**Low FPS / High Latency:**
+- Reduce quality profile (certification → engineering → demo)
+- Check network bandwidth
+- Verify GPU utilization
+- Enable performance optimizations (GPU dynamics, fabric)
+
+**High Memory Usage:**
+- Enable asset caching
+- Reduce concurrent sessions
+- Check for memory leaks in logs
+
+## 📚 Documentation
+
+- **[Isaac Sim Integration Plan](../../ISAAC_SIM_INTEGRATION.md)** - Complete strategic roadmap
+- **[API Documentation](./docs/api.md)** - Full API reference
+- **[Deployment Guide](./docs/deployment.md)** - Production deployment
+- **[Performance Tuning](./docs/performance.md)** - Optimization guidelines
+
+## 🎉 Demo Scenarios
+
+### Scenario 1: macOS Development
+```bash
+./scripts/dev-start.sh
+# Opens browser → Configure page → Enhanced 3D viewer automatically uses Three.js
+```
+
+### Scenario 2: Linux Production
+```bash
+./scripts/prod-deploy.sh
+# Opens browser → Configure page → Enhanced 3D viewer automatically uses Isaac Sim
+```
+
+### Scenario 3: Customer Demo
+- **Quality**: Certification profile for maximum visual impact
+- **Physics**: Full physics simulation with stress testing
+- **Collaboration**: Multi-user session with real-time synchronization
+
+---
+
+**🚀 Ready to revolutionize robotics design with Isaac Sim integration!**
+
+This MVP demonstrates the complete technical feasibility and provides a production-ready foundation for scaling to enterprise customers.

@@ -1,0 +1,217 @@
+# Docker Compose for Anvil Sim - Isaac Sim Integration Service
+# Supports both development (no GPU) and production (with GPU) configurations
+
+version: '3.8'
+
+services:
+  # Development service (no Isaac Sim, for local macOS/Windows development)
+  anvil-sim-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        BUILD_TARGET: development-base
+    container_name: anvil-sim-dev
+    ports:
+      - "8000:8000"  # gRPC API
+      - "8001:8001"  # WebSocket/WebRTC streaming
+      - "8002:8002"  # Metrics
+      - "8211:8211"  # Isaac Sim livestream (mock)
+    environment:
+      # Development environment variables
+      ANVIL_HEADLESS: "false"
+      ANVIL_LOG_LEVEL: "DEBUG"
+      ANVIL_LIVESTREAM: "false"
+      ANVIL_WIDTH: "1280"
+      ANVIL_HEIGHT: "720"
+      ANVIL_PHYSICS_HZ: "60"
+      ANVIL_RENDER_HZ: "30"
+      
+      # Database connection (connects to hammer-orchestrator)
+      DATABASE_URL: "postgresql://smith:forge_dev@postgres:5432/sepulki"
+      REDIS_URL: "redis://redis:6379"
+      
+      # Feature flags for development
+      ANVIL_VIDEO_STREAMING: "true"
+      ANVIL_TELEMETRY_STREAMING: "true"
+      ANVIL_STRESS_TESTING: "true"
+    volumes:
+      # Mount source for hot reload
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./tests:/app/tests
+      
+      # Persistent storage
+      - anvil_cache_dev:/tmp/anvil
+      - anvil_assets_dev:/assets
+      
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Production service (with Isaac Sim and GPU support)
+  anvil-sim-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        BUILD_TARGET: isaac-sim-base
+    container_name: anvil-sim-prod
+    ports:
+      - "8000:8000"  # gRPC API
+      - "8001:8001"  # WebSocket/WebRTC streaming
+      - "8002:8002"  # Metrics
+      - "8211:8211"  # Isaac Sim livestream
+    environment:
+      # Production environment variables
+      ANVIL_HEADLESS: "true"
+      ANVIL_LOG_LEVEL: "INFO"
+      ANVIL_LIVESTREAM: "true"
+      ANVIL_WIDTH: "1920"
+      ANVIL_HEIGHT: "1080"
+      ANVIL_PHYSICS_HZ: "240"
+      ANVIL_RENDER_HZ: "60"
+      
+      # GPU optimization
+      ANVIL_GPU_DYNAMICS: "true"
+      ANVIL_USE_FABRIC: "true"
+      ANVIL_CACHING: "true"
+      ANVIL_LOD: "true"
+      ANVIL_CULLING: "true"
+      
+      # Database connection
+      DATABASE_URL: "postgresql://smith:forge_prod@postgres:5432/sepulki"
+      REDIS_URL: "redis://redis:6379"
+      
+      # Security
+      JWT_SECRET: "${JWT_SECRET:-default-jwt-secret-change-in-production}"
+      ANVIL_AUTH: "true"
+      ANVIL_CORS_ORIGINS: "https://forge.sepulki.com,https://sepulki.com"
+    volumes:
+      # Persistent storage
+      - anvil_cache_prod:/tmp/anvil
+      - anvil_assets_prod:/assets
+      - anvil_logs:/var/log/anvil
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Shared services
+  postgres:
+    image: postgres:15
+    container_name: anvil-postgres
+    environment:
+      POSTGRES_DB: sepulki
+      POSTGRES_USER: smith
+      POSTGRES_PASSWORD: forge_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../infrastructure/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: anvil-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Monitoring and metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: anvil-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: anvil-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - sepulki-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+# Networks
+networks:
+  sepulki-network:
+    driver: bridge
+    name: sepulki-network
+
+# Volumes
+volumes:
+  # Development volumes
+  anvil_cache_dev:
+    name: anvil_cache_dev
+  anvil_assets_dev:
+    name: anvil_assets_dev
+    
+  # Production volumes
+  anvil_cache_prod:
+    name: anvil_cache_prod
+  anvil_assets_prod:
+    name: anvil_assets_prod
+  anvil_logs:
+    name: anvil_logs
+    
+  # Database volumes
+  postgres_data:
+    name: anvil_postgres_data
+  redis_data:
+    name: anvil_redis_data
+    
+  # Monitoring volumes
+  prometheus_data:
+    name: anvil_prometheus_data
+  grafana_data:
+    name: anvil_grafana_data

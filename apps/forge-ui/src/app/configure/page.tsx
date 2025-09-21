@@ -12,9 +12,9 @@ import { fetchCatalog, selectFromCatalog } from '@/lib/catalog';
 import { SaveDesignModal } from '@/components/SaveDesignModal';
 import { useAuth } from '@/components/AuthProvider';
 
-// Dynamically import the Scene3D component with SSR disabled
-const Scene3D = dynamic(
-  () => import('@/components/Scene3D').then((mod) => mod.Scene3D),
+// Dynamically import the Isaac Sim Display with SSR disabled
+const IsaacSimDisplay = dynamic(
+  () => import('@/components/IsaacSimDisplay').then((mod) => mod.IsaacSimDisplay),
   { ssr: false }
 );
 
@@ -266,40 +266,28 @@ function ConfigureContent() {
         {/* Right Column - 3D Visualization */}
         <div className="bg-gray-50 rounded-lg p-6">
           <div className="aspect-square w-full bg-gray-700 rounded-lg overflow-hidden relative">
-            {preset === 'unitree-dog' && (window as any).__heroUrl ? (
-              // Static GLB hero preview
-              <Scene3D heroUrl={(window as any).__heroUrl as string} />
-            ) : (
-              <Scene3D
-                spec={builtSpec}
-                urdf={builtUrdf}
-                assetBaseUrl="/robots/sample-arm-01"
-                profile={builtSpec ? {
-                name: 'demo',
-                duration: 4,
-                loop: true,
-                frames: [
-                  { t: 0, pose: { joint1: 0, joint2: 0 } },
-                  { t: 2, pose: { joint1: 1.0, joint2: 0.6 } },
-                  { t: 4, pose: { joint1: 0, joint2: 0 } },
-                ]
-              } : undefined}
-                playing={playing}
-                playbackRate={rate}
-                seekTime={seek}
-                onRobotApi={(api) => {
-                robotApiRef.current = api
-                const joints = api.listJoints()
-                const snapshot = joints.map((j) => ({
-                  name: j.name,
-                  value: api.getJointValue(j.name),
-                  min: j.limit?.lower,
-                  max: j.limit?.upper,
+            <IsaacSimDisplay
+              spec={builtSpec}
+              urdf={builtUrdf}
+              environment="warehouse"
+              qualityProfile="engineering"
+              enablePhysics={true}
+              userId={smith?.email || 'anonymous'}
+              onJointControl={(jointStates) => {
+                // Update joint display when Isaac Sim controls change
+                const snapshot = Object.entries(jointStates).map(([name, value]) => ({
+                  name,
+                  value,
+                  min: -1.57,
+                  max: 1.57,
                 }))
                 setJointSnapshot(snapshot)
-                }}
-              />
-            )}
+              }}
+              onError={(error) => {
+                console.error('Isaac Sim error:', error)
+              }}
+              className="w-full h-full"
+            />
           </div>
           {/* Source selector + inputs */}
           <div className="mt-4">

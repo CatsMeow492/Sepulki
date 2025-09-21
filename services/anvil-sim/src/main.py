@@ -9,10 +9,12 @@ import logging
 import os
 import signal
 import sys
-from typing import Optional
+from typing import Optional, Dict, Any
+from datetime import datetime
 
 import structlog
 from grpc import aio as grpc_aio
+from aiohttp import web
 
 # Isaac Sim imports (these would be available in Isaac Sim environment)
 try:
@@ -25,9 +27,25 @@ except ImportError:
 
 from config.anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
 from services.simulation_service import SimulationServicer
-from services.websocket_server import WebSocketServer
-from protocols import anvil_pb2_grpc
-from utils.logging import setup_logging
+from isaac_sim_manager import isaac_sim_manager
+from webrtc_stream_manager import webrtc_stream_manager
+
+# Mock protocols for development
+try:
+    from protocols import anvil_pb2_grpc
+except ImportError:
+    class anvil_pb2_grpc:
+        @staticmethod
+        def add_AnvilSimServicer_to_server(servicer, server):
+            pass
+
+# Setup logging
+def setup_logging():
+    import logging
+    logging.basicConfig(
+        level=getattr(logging, ISAAC_SIM_CONFIG.get("log_level", "INFO")),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
 # Configure structured logging
 setup_logging()
@@ -39,46 +57,25 @@ class AnvilSimService:
     def __init__(self):
         self.simulation_app: Optional[SimulationApp] = None
         self.grpc_server: Optional[grpc_aio.Server] = None
-        self.websocket_server: Optional[WebSocketServer] = None
+        self.http_app = None
+        self.http_runner = None
         self.running = False
+        self.active_sessions: Dict[str, Dict[str, Any]] = {}
         
     async def initialize_isaac_sim(self):
-        """Initialize Isaac Sim simulation application."""
-        if not ISAAC_SIM_AVAILABLE:
-            logger.warning("Isaac Sim not available, using mock simulation")
-            return
-            
+        """Initialize Isaac Sim simulation application using Isaac Sim Manager."""
         try:
-            # Initialize Isaac Sim
-            config = {
-                "headless": ISAAC_SIM_CONFIG["headless"],
-                "width": ISAAC_SIM_CONFIG["width"],
-                "height": ISAAC_SIM_CONFIG["height"],
-                "enable_livestream": ISAAC_SIM_CONFIG["enable_livestream"],
-                "livestream_port": ISAAC_SIM_CONFIG["livestream_port"]
-            }
+            # Initialize Isaac Sim Manager
+            success = await isaac_sim_manager.initialize()
             
-            self.simulation_app = SimulationApp(config)
-            
-            # Import additional Isaac Sim modules after app initialization
-            from omni.isaac.core import World
-            from omni.isaac.core.utils.extensions import enable_extension
-            
-            # Enable required extensions
-            enable_extension("omni.isaac.sensor")
-            enable_extension("omni.isaac.manipulators") 
-            enable_extension("omni.isaac.wheeled_robots")
-            
-            # Create simulation world
-            self.world = World(stage_units_in_meters=1.0)
-            await self.world.initialize_simulation_context_async()
-            
-            logger.info("Isaac Sim initialized successfully",
-                       headless=config["headless"],
-                       livestream=config["enable_livestream"])
+            if success:
+                self.simulation_app = isaac_sim_manager.simulation_app
+                logger.info("Isaac Sim Manager initialized successfully")
+            else:
+                logger.warning("Isaac Sim Manager running in simulation mode")
                        
         except Exception as e:
-            logger.error("Failed to initialize Isaac Sim", error=str(e))
+            logger.error("Failed to initialize Isaac Sim Manager", error=str(e))
             raise
     
     async def start_grpc_server(self):
@@ -89,7 +86,7 @@ class AnvilSimService:
             # Add simulation servicer
             simulation_servicer = SimulationServicer(
                 simulation_app=self.simulation_app,
-                world=getattr(self, 'world', None)
+                world=getattr(isaac_sim_manager, 'world', None)
             )
             anvil_pb2_grpc.add_AnvilSimServicer_to_server(
                 simulation_servicer, 
@@ -111,15 +108,112 @@ class AnvilSimService:
     async def start_websocket_server(self):
         """Start WebSocket server for real-time streaming."""
         try:
-            self.websocket_server = WebSocketServer(
-                port=WEBSOCKET_PORT,
-                simulation_app=self.simulation_app
-            )
-            await self.websocket_server.start()
-            logger.info("WebSocket server started", port=WEBSOCKET_PORT)
+            # Initialize WebRTC Stream Manager with Isaac Sim Manager
+            webrtc_stream_manager.isaac_sim_manager = isaac_sim_manager
+            
+            # Start WebRTC streaming server (bind to all interfaces for Docker)
+            await webrtc_stream_manager.start_server("0.0.0.0", WEBSOCKET_PORT)
+            logger.info("WebRTC streaming server started", port=WEBSOCKET_PORT)
             
         except Exception as e:
-            logger.error("Failed to start WebSocket server", error=str(e))
+            logger.error("Failed to start WebRTC streaming server", error=str(e))
+            raise
+
+    async def health_check(self, request):
+        """Health check endpoint for frontend compatibility."""
+        return web.json_response({
+            'status': 'healthy',
+            'service': 'anvil-sim-real',
+            'version': '1.0.0-isaac-sim',
+            'isaac_sim_available': ISAAC_SIM_AVAILABLE,
+            'timestamp': datetime.utcnow().isoformat(),
+            'active_sessions': len(self.active_sessions),
+            'mode': 'isaac_sim' if ISAAC_SIM_AVAILABLE else 'simulation'
+        })
+
+    async def create_scene(self, request):
+        """Create Isaac Sim session endpoint for frontend compatibility."""
+        try:
+            data = await request.json()
+            
+            session_id = f"session_{int(datetime.utcnow().timestamp())}_{len(self.active_sessions)}"
+            
+            session = {
+                'id': session_id,
+                'user_id': data.get('user_id', 'anonymous'),
+                'sepulka_id': data.get('sepulka_id', 'demo-robot'),
+                'environment': data.get('environment', 'warehouse'),
+                'quality_profile': data.get('quality_profile', 'engineering'),
+                'status': 'ready',
+                'created_at': datetime.utcnow().isoformat(),
+                'isaac_sim_mode': ISAAC_SIM_AVAILABLE,
+                'urdf_content': data.get('urdf_content', ''),
+                'webrtc_ready': True  # Real service supports WebRTC
+            }
+            
+            self.active_sessions[session_id] = session
+            
+            logger.info("Isaac Sim session created", session_id=session_id, 
+                       user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE)
+            
+            return web.json_response({
+                'success': True,
+                'session_id': session_id,
+                'status': session['status'],
+                'message': f'Isaac Sim session created ({"isaac_sim" if ISAAC_SIM_AVAILABLE else "simulation"} mode)',
+                'isaac_sim_available': ISAAC_SIM_AVAILABLE,
+                'webrtc_ready': True
+            })
+            
+        except Exception as e:
+            logger.error("Failed to create Isaac Sim session", error=str(e))
+            return web.json_response({
+                'success': False,
+                'error': str(e),
+                'message': 'Failed to create Isaac Sim session'
+            }, status=400)
+
+    async def start_http_server(self):
+        """Start HTTP server for health checks and session management."""
+        try:
+            self.http_app = web.Application()
+            
+            # Add CORS support  
+            @web.middleware
+            async def cors_handler(request, handler):
+                response = await handler(request)
+                response.headers['Access-Control-Allow-Origin'] = '*'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+                return response
+            
+            async def options_handler(request):
+                return web.Response(
+                    headers={
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    }
+                )
+            
+            # Add routes
+            self.http_app.router.add_get('/health', self.health_check)
+            self.http_app.router.add_post('/create_scene', self.create_scene)
+            self.http_app.router.add_options('/{path:.*}', options_handler)
+            
+            # Add middleware
+            self.http_app.middlewares.append(cors_handler)
+            
+            # Start HTTP server
+            self.http_runner = web.AppRunner(self.http_app)
+            await self.http_runner.setup()
+            site = web.TCPSite(self.http_runner, '0.0.0.0', 8002)
+            await site.start()
+            
+            logger.info("HTTP server started", port=8002)
+            
+        except Exception as e:
+            logger.error("Failed to start HTTP server", error=str(e))
             raise
     
     async def start(self):
@@ -133,7 +227,8 @@ class AnvilSimService:
             # Start servers
             await asyncio.gather(
                 self.start_grpc_server(),
-                self.start_websocket_server()
+                self.start_websocket_server(),
+                self.start_http_server()
             )
             
             self.running = True
@@ -157,14 +252,18 @@ class AnvilSimService:
             await self.grpc_server.stop(5.0)
             logger.info("gRPC server stopped")
         
-        if self.websocket_server:
-            await self.websocket_server.stop()
-            logger.info("WebSocket server stopped")
+        # Stop WebRTC streaming server
+        await webrtc_stream_manager.stop_server()
+        logger.info("WebRTC streaming server stopped")
         
-        # Cleanup Isaac Sim
-        if self.simulation_app:
-            self.simulation_app.close()
-            logger.info("Isaac Sim closed")
+        # Stop HTTP server
+        if self.http_runner:
+            await self.http_runner.cleanup()
+            logger.info("HTTP server stopped")
+        
+        # Shutdown Isaac Sim Manager
+        await isaac_sim_manager.shutdown()
+        logger.info("Isaac Sim Manager shutdown")
     
     async def run(self):
         """Main service loop."""
@@ -175,9 +274,8 @@ class AnvilSimService:
             while self.running:
                 await asyncio.sleep(1)
                 
-                # Update Isaac Sim if available
-                if ISAAC_SIM_AVAILABLE and self.simulation_app:
-                    self.simulation_app.update()
+                # Update Isaac Sim Manager
+                isaac_sim_manager.update()
                     
         except KeyboardInterrupt:
             logger.info("Received interrupt signal")

@@ -15,10 +15,11 @@
   },
   "dependencies": {
     "@headlessui/react": "^1.7.19",
-    "@react-three/drei": "^9.121.4",
-    "@react-three/fiber": "^8.15.16",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@types/three": "^0.173.0",
     "autoprefixer": "^10.0.1",
+    "lucide-react": "^0.544.0",
     "next": "14.1.0",
     "next-auth": "^5.0.0-beta.4",
     "openai": "^4.83.0",
