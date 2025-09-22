@@ -238,35 +238,47 @@ class IsaacSimVideoGenerator:
         cv2.circle(frame, (arm2_end_x, arm2_end_y), int(12 * scale), (100, 100, 100), -1)
         
     def _render_universal_robot(self, frame: np.ndarray, center_x: int, center_y: int, scale: float):
-        """Render Universal Robots UR5e/UR10e."""
-        # UR robots have distinctive blue color scheme
+        """Render Universal Robots UR10e - MASSIVE BLUE INDUSTRIAL ROBOT (UNMISTAKABLY DIFFERENT)."""
+        # UR robots have 6 DOF and MASSIVE distinctive blue industrial appearance
         joint1_angle = self.joint_states.get('joint1', 0.0)
         joint2_angle = self.joint_states.get('joint2', 0.0)
         
-        # UR robot base (blue theme)
-        base_size = int(35 * scale)
+        # 🏭 MASSIVE BLUE INDUSTRIAL BASE (10x larger than Franka)
+        base_width = int(200 * scale)  # HUGE width  
+        base_height = int(80 * scale)  # THICK height
         cv2.rectangle(frame, 
-                     (center_x - base_size//2, center_y + int(45 * scale)),
-                     (center_x + base_size//2, center_y + int(75 * scale)),
-                     (70, 130, 200), -1)  # UR blue
+                     (center_x - base_width//2, center_y + int(20 * scale)),
+                     (center_x + base_width//2, center_y + int(100 * scale)),
+                     (0, 100, 255), -1)  # BRIGHT ELECTRIC BLUE
         
-        # UR arm segments
-        arm1_length = int(85 * scale)
+        # Giant "UR10e INDUSTRIAL" text across the entire base
+        cv2.putText(frame, "UR10e INDUSTRIAL", (center_x - 120, center_y + 65), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+        
+        # 🦾 MASSIVE BLUE ARM SEGMENTS (much thicker and longer than Franka)
+        arm1_length = int(200 * scale)  # MUCH longer than Franka
         arm1_end_x = center_x + int(math.cos(joint1_angle - math.pi/2) * arm1_length)
         arm1_end_y = center_y + int(math.sin(joint1_angle - math.pi/2) * arm1_length)
         
-        cv2.line(frame, (center_x, center_y), (arm1_end_x, arm1_end_y), (90, 150, 220), int(9 * scale))
+        cv2.line(frame, (center_x, center_y), (arm1_end_x, arm1_end_y), (0, 120, 255), int(35 * scale))  # THICK BLUE
         
-        # UR joint indicators (blue theme)
-        cv2.circle(frame, (center_x, center_y), int(7 * scale), (50, 100, 180), -1)
+        # Second MASSIVE segment
+        arm2_length = int(160 * scale)  # MUCH longer
+        arm2_angle = joint1_angle + joint2_angle
+        arm2_end_x = arm1_end_x + int(math.cos(arm2_angle - math.pi/2) * arm2_length)
+        arm2_end_y = arm1_end_y + int(math.sin(arm2_angle - math.pi/2) * arm2_length)
         
-        # Second segment
-        arm2_length = int(65 * scale)
-        arm2_end_x = arm1_end_x + int(math.cos(joint1_angle + joint2_angle - math.pi/2) * arm2_length)
-        arm2_end_y = arm1_end_y + int(math.sin(joint1_angle + joint2_angle - math.pi/2) * arm2_length)
+        cv2.line(frame, (arm1_end_x, arm1_end_y), (arm2_end_x, arm2_end_y), (0, 80, 200), int(30 * scale))  # THICK DARK BLUE
         
-        cv2.line(frame, (arm1_end_x, arm1_end_y), (arm2_end_x, arm2_end_y), (110, 170, 240), int(7 * scale))
-        cv2.circle(frame, (arm1_end_x, arm1_end_y), int(5 * scale), (50, 100, 180), -1)
+        # 🔵 MASSIVE UR joint indicators (HUGE blue circles)
+        cv2.circle(frame, (center_x, center_y), int(25 * scale), (100, 200, 255), -1)  # HUGE Light blue
+        cv2.circle(frame, (arm1_end_x, arm1_end_y), int(20 * scale), (0, 100, 200), -1)  # HUGE Dark blue
+        
+        # 🟠 MASSIVE industrial end effector (orange to contrast blue)
+        cv2.rectangle(frame, 
+                     (arm2_end_x - int(40 * scale), arm2_end_y - int(25 * scale)),
+                     (arm2_end_x + int(40 * scale), arm2_end_y + int(25 * scale)),
+                     (255, 140, 0), -1)  # MASSIVE orange gripper
         
         # UR end effector
         cv2.circle(frame, (arm2_end_x, arm2_end_y), int(10 * scale), (30, 80, 160), -1)

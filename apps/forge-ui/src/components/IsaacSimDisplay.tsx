@@ -52,6 +52,7 @@ export function IsaacSimDisplay({
   const [showPhysics, setShowPhysics] = useState(enablePhysics)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showCameraControls, setShowCameraControls] = useState(false)
+  const [videoStreamWorking, setVideoStreamWorking] = useState(false)
   const [cameraState, setCameraState] = useState({
     position: { x: 4, y: 4, z: 4 },
     target: { x: 0, y: 0, z: 0 },
@@ -86,7 +87,7 @@ export function IsaacSimDisplay({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id: userId,
-            sepulka_id: spec?.id || 'demo-robot',
+            sepulka_id: spec?.name || 'demo-robot',
             environment,
             quality_profile: qualityProfile,
             urdf_content: typeof urdf === 'string' ? urdf : urdf?.toString(),
@@ -103,9 +104,14 @@ export function IsaacSimDisplay({
         const newSessionId = sessionData.session_id
         setSessionId(newSessionId)
         
+        // Store session ID for robot changes
+        localStorage.setItem('isaac_sim_session_id', newSessionId)
+        
         console.log('✅ Isaac Sim Display session created:', newSessionId)
 
-        // Establish WebSocket connection
+        // WebSocket video streaming will be started after connection
+
+        // Establish WebSocket connection for controls
         const ws = new WebSocket('ws://localhost:8001')
 
         ws.onopen = () => {
@@ -128,65 +134,56 @@ export function IsaacSimDisplay({
 
           if (data.type === 'connection_established') {
             setConnectionState('connected')
-            console.log('✅ Isaac Sim WebSocket connection established')
+            console.log('✅ Isaac Sim WebSocket connection established for controls')
             
-            // Set up WebRTC for video streaming (will be muted by browser)
-            try {
-              const peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-              })
-
-              peerConnectionRef.current = peerConnection
-
-              // Handle incoming video stream
-              peerConnection.ontrack = (event) => {
-                console.log('📹 Received Isaac Sim video stream!')
-                if (videoRef.current && event.streams[0]) {
-                  videoRef.current.srcObject = event.streams[0]
-                  videoRef.current.play().catch(console.error)
-                }
-              }
-
-              // Handle ICE candidates
-              peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                  ws.send(JSON.stringify({
-                    type: 'ice_candidate',
-                    candidate: event.candidate
-                  }))
-                }
-              }
-
-              // Create offer for Isaac Sim
-              peerConnection.createOffer({
-                offerToReceiveVideo: true,
-                offerToReceiveAudio: false
-              }).then((offer) => {
-                return peerConnection.setLocalDescription(offer)
-              }).then(() => {
-                ws.send(JSON.stringify({
-                  type: 'offer',
-                  session_id: newSessionId,
-                  sdp: peerConnection.localDescription?.sdp
-                }))
-                console.log('📡 WebRTC offer sent to Isaac Sim (after join_session)')
-              })
-
-            } catch (error) {
-              console.error('❌ WebRTC setup failed:', error)
-            }
+            // Request WebSocket video streaming
+            ws.send(JSON.stringify({
+              type: 'start_video_stream',
+              session_id: newSessionId
+            }))
+            console.log('🎬 Requested WebSocket video streaming')
             
-          } else if (data.type === 'answer') {
-            // Handle WebRTC answer
-            try {
-              const answerDescription = new RTCSessionDescription({
-                type: 'answer',
-                sdp: data.sdp
-              })
-              peerConnectionRef.current?.setRemoteDescription(answerDescription)
-              console.log('✅ WebRTC connection established with Isaac Sim')
-            } catch (error) {
-              console.error('❌ WebRTC answer failed:', error)
+          } else if (data.type === 'video_stream_started') {
+            console.log('✅ WebSocket video stream started')
+            setVideoStreamWorking(true)
+            
+          } else if (data.type === 'video_frame') {
+            // Display video frame via Canvas (fixes browser video element content-type rejection)
+            if (canvasRef.current && data.frame_data) {
+              try {
+                const canvas = canvasRef.current
+                const ctx = canvas.getContext('2d')
+                if (!ctx) return
+                
+                // Create image from base64 data
+                const img = new Image()
+                img.onload = () => {
+                  // Set canvas size to match image
+                  canvas.width = img.width
+                  canvas.height = img.height
+                  
+                  // Clear and draw the frame
+                  ctx.clearRect(0, 0, canvas.width, canvas.height)
+                  ctx.drawImage(img, 0, 0)
+                  
+                  setVideoStreamWorking(true)
+                }
+                
+                img.onerror = () => {
+                  console.error('❌ Failed to load video frame image')
+                  setVideoStreamWorking(false)
+                }
+                
+                img.src = `data:image/jpeg;base64,${data.frame_data}`
+                
+                // Log every 30 frames (every 2 seconds at 15 FPS)
+                if (data.frame_count % 30 === 0) {
+                  console.log(`📹 Isaac Sim Canvas frame #${data.frame_count} - Robot: ${robotConfig?.selectedRobot?.name || 'Default'}`)
+                }
+              } catch (error) {
+                console.error('❌ Canvas frame processing error:', error)
+                setVideoStreamWorking(false)
+              }
             }
             
           } else if (data.type === 'joint_update_response') {
@@ -258,13 +255,20 @@ export function IsaacSimDisplay({
 
   // Camera control functions
   const handleCameraChange = (property: string, axis: string, value: number) => {
-    setCameraState(prev => ({
-      ...prev,
-      [property]: {
-        ...prev[property as keyof typeof prev],
-        [axis]: value
+    setCameraState(prev => {
+      const currentProperty = prev[property as keyof typeof prev]
+      const propertyValue = typeof currentProperty === 'object' && currentProperty !== null 
+        ? currentProperty as Record<string, number>
+        : {}
+      
+      return {
+        ...prev,
+        [property]: {
+          ...propertyValue,
+          [axis]: value
+        }
       }
-    }))
+    })
   }
 
   const handleFOVChange = (fov: number) => {
@@ -312,173 +316,8 @@ export function IsaacSimDisplay({
     return () => clearTimeout(timeoutId)
   }, [cameraState, sessionId, websocket])
 
-  // Visual robot simulation rendering (replaces WebRTC while tracks are muted)
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || connectionState !== 'connected') return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    // Set canvas size
-    const resizeCanvas = () => {
-      const rect = canvas.getBoundingClientRect()
-      canvas.width = rect.width * window.devicePixelRatio
-      canvas.height = rect.height * window.devicePixelRatio
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
-      ctx.imageSmoothingEnabled = true
-    }
-
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-
-    // Render loop for Isaac Sim visualization
-    const render = () => {
-      const { width, height } = canvas
-      const displayWidth = width / window.devicePixelRatio
-      const displayHeight = height / window.devicePixelRatio
-
-      // Clear with Isaac Sim style background
-      const gradient = ctx.createLinearGradient(0, 0, 0, displayHeight)
-      gradient.addColorStop(0, '#1a1a2e')
-      gradient.addColorStop(1, '#16213e')
-      ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, displayWidth, displayHeight)
-
-      // Draw warehouse grid (responds to camera position)
-      ctx.strokeStyle = 'rgba(100, 200, 255, 0.3)'
-      ctx.lineWidth = 1
-      ctx.setLineDash([2, 2])
-      
-      const gridSize = Math.max(20, 50 - (cameraState.position.z * 3))
-      const offsetX = (cameraState.position.x * 15) % gridSize
-      const offsetY = (cameraState.position.y * 15) % gridSize
-      
-      for (let x = -offsetX; x < displayWidth; x += gridSize) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, displayHeight)
-        ctx.stroke()
-      }
-      for (let y = -offsetY; y < displayHeight; y += gridSize) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(displayWidth, y)
-        ctx.stroke()
-      }
-
-      // Calculate robot position based on camera (perspective projection)
-      const centerX = displayWidth / 2 - (cameraState.position.x * 25)
-      const centerY = displayHeight / 2 - (cameraState.position.y * 15)
-      const scale = Math.max(0.3, 3.0 / Math.max(cameraState.position.z, 1.5))
-
-      // Draw Isaac Sim robot with real-time joint movements
-      const joint1 = jointStates.joint1 || 0
-      const joint2 = jointStates.joint2 || 0
-
-      // Robot base
-      ctx.fillStyle = '#4a90e2'
-      ctx.shadowColor = 'rgba(74, 144, 226, 0.5)'
-      ctx.shadowBlur = 10
-      ctx.fillRect(centerX - 25 * scale, centerY + 30 * scale, 50 * scale, 25 * scale)
-      ctx.shadowBlur = 0
-
-      // First arm segment (responds to joint1)
-      const arm1Length = 80 * scale
-      const arm1EndX = centerX + arm1Length * Math.cos(joint1)
-      const arm1EndY = centerY + arm1Length * Math.sin(joint1)
-
-      ctx.strokeStyle = '#2ecc71'
-      ctx.lineWidth = 8 * scale
-      ctx.lineCap = 'round'
-      ctx.shadowColor = 'rgba(46, 204, 113, 0.4)'
-      ctx.shadowBlur = 5
-      ctx.beginPath()
-      ctx.moveTo(centerX, centerY)
-      ctx.lineTo(arm1EndX, arm1EndY)
-      ctx.stroke()
-
-      // Second arm segment (responds to joint1 + joint2)
-      const arm2Length = 60 * scale
-      const totalAngle = joint1 + joint2
-      const arm2EndX = arm1EndX + arm2Length * Math.cos(totalAngle)
-      const arm2EndY = arm1EndY + arm2Length * Math.sin(totalAngle)
-
-      ctx.strokeStyle = '#e74c3c'
-      ctx.lineWidth = 6 * scale
-      ctx.shadowColor = 'rgba(231, 76, 60, 0.4)'
-      ctx.beginPath()
-      ctx.moveTo(arm1EndX, arm1EndY)
-      ctx.lineTo(arm2EndX, arm2EndY)
-      ctx.stroke()
-      ctx.shadowBlur = 0
-
-      // Draw joints
-      ctx.fillStyle = '#f39c12'
-      ctx.beginPath()
-      ctx.arc(centerX, centerY, 12 * scale, 0, 2 * Math.PI)
-      ctx.fill()
-
-      ctx.beginPath()
-      ctx.arc(arm1EndX, arm1EndY, 8 * scale, 0, 2 * Math.PI)
-      ctx.fill()
-
-      // Draw end effector  
-      ctx.fillStyle = '#9b59b6'
-      ctx.shadowColor = 'rgba(155, 89, 182, 0.6)'
-      ctx.shadowBlur = 8
-      ctx.beginPath()
-      ctx.arc(arm2EndX, arm2EndY, 10 * scale, 0, 2 * Math.PI)
-      ctx.fill()
-      ctx.shadowBlur = 0
-
-      // Isaac Sim branding overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
-      ctx.fillRect(15, 15, 380, 160)
-      ctx.strokeStyle = '#00ff41'
-      ctx.lineWidth = 2
-      ctx.strokeRect(15, 15, 380, 160)
-
-      ctx.fillStyle = '#00ff41'
-      ctx.font = 'bold 16px Arial'
-      ctx.fillText('NVIDIA Isaac Sim - Live Physics Simulation', 25, 35)
-
-      ctx.fillStyle = '#4a90e2'
-      ctx.font = '12px Arial'
-      ctx.fillText(`Robot: ${robotConfig?.selectedRobot?.name || 'Franka Emika Panda'}`, 25, 55)
-      ctx.fillText(`Isaac Sim Asset: ${robotConfig?.selectedRobot?.isaac_sim_path?.split('/').pop() || 'franka.usd'}`, 25, 72)
-
-      ctx.fillStyle = '#2ecc71' 
-      ctx.font = '11px Arial'
-      ctx.fillText(`Camera: (${cameraState.position.x.toFixed(1)}, ${cameraState.position.y.toFixed(1)}, ${cameraState.position.z.toFixed(1)}) FOV: ${cameraState.fov}°`, 25, 95)
-      ctx.fillText(`Scale: ${scale.toFixed(2)} | Environment: ${environment}`, 25, 110)
-      
-      ctx.fillStyle = '#f39c12'
-      ctx.font = '10px Arial'
-      ctx.fillText(`Joint1: ${joint1.toFixed(3)} rad (${(joint1 * 180 / Math.PI).toFixed(1)}°)`, 25, 130)
-      ctx.fillText(`Joint2: ${joint2.toFixed(3)} rad (${(joint2 * 180 / Math.PI).toFixed(1)}°)`, 25, 145)
-
-      ctx.fillStyle = '#e74c3c'
-      ctx.font = '9px Arial'
-      ctx.fillText('Note: WebRTC video muted by browser security - using Canvas simulation', 25, 165)
-
-      // Continue animation if component is still mounted
-      if (animationRef.current !== undefined) {
-        animationRef.current = requestAnimationFrame(render)
-      }
-    }
-
-    // Start animation loop
-    animationRef.current = requestAnimationFrame(render)
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-      if (animationRef.current !== undefined) {
-        cancelAnimationFrame(animationRef.current)
-        animationRef.current = undefined
-      }
-    }
-  }, [connectionState, cameraState, jointStates, robotConfig, environment])
+  // Canvas video display is now handled directly by video frame events
+  // (No useEffect needed - Canvas updated via WebSocket frames)
 
   // Fullscreen functionality
   const toggleFullscreen = async () => {
@@ -576,6 +415,7 @@ export function IsaacSimDisplay({
   return (
     <div 
       ref={containerRef}
+      data-testid="isaac-sim-display"
       className={`relative bg-black overflow-hidden ${
         isFullscreen 
           ? 'fixed inset-0 z-50' 
@@ -583,6 +423,14 @@ export function IsaacSimDisplay({
       }`}
     >
       {/* Hidden WebRTC Video (muted by browser) */}
+      {/* Isaac Sim WebSocket Video Stream via Canvas (fixes content-type issue) */}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full object-cover"
+        style={{ display: 'block', zIndex: 10, position: 'relative' }}
+      />
+      
+      {/* Hidden Video Element (WebSocket frames render to Canvas instead) */}
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
@@ -590,17 +438,11 @@ export function IsaacSimDisplay({
         autoPlay
         muted
         playsInline
-      />
-      
-      {/* Visual Robot Simulation Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        style={{ display: 'block' }}
+        controls={false}
       />
 
       {/* Professional Isaac Sim HUD */}
-      <div className="absolute top-4 left-4 z-20">
+      <div className="absolute top-4 left-4 z-5">
         <div className="bg-black/95 backdrop-blur-sm rounded-xl p-5 border border-yellow-500/30 shadow-2xl">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
@@ -685,7 +527,7 @@ export function IsaacSimDisplay({
 
       {/* Camera Controls */}
       {showCameraControls && (
-        <div className="absolute top-4 left-4 z-20 max-w-sm">
+        <div className="absolute top-20 right-4 z-30 max-w-sm">
           <div className="bg-black/95 backdrop-blur-sm rounded-xl p-4 space-y-4 border border-cyan-500/40">
             <div className="text-white text-sm font-bold mb-3 flex items-center">
               <Eye className="w-4 h-4 mr-2 text-cyan-400" />

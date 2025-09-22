@@ -368,6 +368,9 @@ class WebRTCStreamManager:
         elif message_type == "joint_control":
             await self._handle_joint_control(client_id, data)
             
+        elif message_type == "start_video_stream":
+            await self._start_video_stream(client_id, data)
+            
         else:
             logger.warning("Unknown message type", 
                           client_id=client_id, message_type=message_type)
@@ -635,6 +638,81 @@ class WebRTCStreamManager:
         del self.clients[client_id]
         
         logger.info("Client disconnected", client_id=client_id)
+    
+    async def _start_video_stream(self, client_id: str, data: Dict[str, Any]):
+        """Start WebSocket video streaming (bypasses browser video element issues)."""
+        client = self.clients.get(client_id)
+        if not client:
+            return
+        
+        try:
+            import base64
+            import cv2
+            import asyncio
+            
+            logger.info("🎬 Starting WebSocket video stream", client_id=client_id)
+            
+            # Start background video streaming task
+            async def video_stream_task():
+                frame_count = 0
+                while client_id in self.clients:
+                    try:
+                        # Generate frame
+                        frame_data = get_video_generator().generate_frame()
+                        
+                        # Encode frame as JPEG
+                        _, buffer = cv2.imencode('.jpg', frame_data, [
+                            cv2.IMWRITE_JPEG_QUALITY, 75,
+                            cv2.IMWRITE_JPEG_OPTIMIZE, 1
+                        ])
+                        
+                        # Convert to base64
+                        frame_base64 = base64.b64encode(buffer).decode('utf-8')
+                        
+                        # Send frame via WebSocket
+                        await self._send_to_client(client_id, {
+                            'type': 'video_frame',
+                            'frame_data': frame_base64,
+                            'frame_count': frame_count,
+                            'timestamp': datetime.utcnow().isoformat()
+                        })
+                        
+                        frame_count += 1
+                        
+                        # Log every 30 frames (every 2 seconds at 15 FPS)
+                        if frame_count % 30 == 0:
+                            logger.info("WebSocket video stream active", 
+                                       client_id=client_id, frame_count=frame_count)
+                        
+                        # 15 FPS (reduced for browser performance)
+                        await asyncio.sleep(1/15)
+                        
+                    except Exception as e:
+                        logger.error("WebSocket video frame error", 
+                                    client_id=client_id, error=str(e))
+                        break
+                
+                logger.info("WebSocket video stream ended", client_id=client_id, total_frames=frame_count)
+            
+            # Start streaming task
+            asyncio.create_task(video_stream_task())
+            
+            # Send confirmation
+            await self._send_to_client(client_id, {
+                'type': 'video_stream_started',
+                'message': 'WebSocket video streaming started',
+                'fps': 30
+            })
+            
+            logger.info("✅ WebSocket video stream started", client_id=client_id)
+            
+        except Exception as e:
+            logger.error("Failed to start WebSocket video stream", 
+                        client_id=client_id, error=str(e))
+            await self._send_to_client(client_id, {
+                'type': 'error',
+                'message': f'Video stream failed: {str(e)}'
+            })
     
     def get_streaming_metrics(self) -> List[StreamMetrics]:
         """Get current streaming performance metrics."""

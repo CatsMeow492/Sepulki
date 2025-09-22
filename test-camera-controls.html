@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Controls Test</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #1a1a1a; color: white; font-family: Arial, sans-serif; }
+        .test-container { max-width: 800px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #2d5a2d; }
+        .error { background: #5a2d2d; }
+        .info { background: #2d2d5a; }
+        button { padding: 10px 20px; margin: 5px; background: #4a4a4a; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #5a5a5a; }
+        .controls { display: none; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .controls.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Isaac Sim Camera Controls Test</h1>
+        
+        <div id="status" class="status info">Testing camera controls visibility...</div>
+        
+        <button onclick="toggleControls()">Toggle Camera Controls</button>
+        <button onclick="testZIndex()">Test Z-Index</button>
+        
+        <div id="controls" class="controls">
+            <h3>Camera Controls</h3>
+            <p>These controls should be visible when toggled on.</p>
+            <div>
+                <label>Position X: <input type="range" min="-10" max="10" step="0.1" value="4"></label>
+            </div>
+            <div>
+                <label>Position Y: <input type="range" min="-10" max="10" step="0.1" value="4"></label>
+            </div>
+            <div>
+                <label>Position Z: <input type="range" min="1" max="15" step="0.1" value="4"></label>
+            </div>
+        </div>
+        
+        <div id="overlay" style="position: absolute; top: 20px; left: 20px; background: rgba(255,0,0,0.5); padding: 10px; z-index: 20;">
+            Overlay Element (z-index: 20)
+        </div>
+    </div>
+
+    <script>
+        let controlsVisible = false;
+        
+        function toggleControls() {
+            controlsVisible = !controlsVisible;
+            const controls = document.getElementById('controls');
+            const status = document.getElementById('status');
+            
+            if (controlsVisible) {
+                controls.classList.add('show');
+                status.textContent = 'Camera controls are now visible';
+                status.className = 'status success';
+            } else {
+                controls.classList.remove('show');
+                status.textContent = 'Camera controls are now hidden';
+                status.className = 'status info';
+            }
+        }
+        
+        function testZIndex() {
+            const controls = document.getElementById('controls');
+            const overlay = document.getElementById('overlay');
+            const status = document.getElementById('status');
+            
+            // Test if controls are behind overlay
+            const controlsRect = controls.getBoundingClientRect();
+            const overlayRect = overlay.getBoundingClientRect();
+            
+            const isOverlapping = !(controlsRect.right < overlayRect.left || 
+                                  controlsRect.left > overlayRect.right || 
+                                  controlsRect.bottom < overlayRect.top || 
+                                  controlsRect.top > overlayRect.bottom);
+            
+            if (isOverlapping) {
+                status.textContent = 'WARNING: Controls may be hidden behind overlay element';
+                status.className = 'status error';
+            } else {
+                status.textContent = 'Controls are not overlapping with overlay';
+                status.className = 'status success';
+            }
+        }
+        
+        // Auto-test on load
+        setTimeout(() => {
+            toggleControls();
+            setTimeout(testZIndex, 100);
+        }, 500);
+    </script>
+</body>
+</html>

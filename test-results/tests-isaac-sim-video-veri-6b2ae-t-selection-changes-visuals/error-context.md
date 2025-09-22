@@ -6,10 +6,18 @@
     - /url: /
   - link "Forge Robot":
     - /url: /configure
+  - link "My Designs":
+    - /url: /designs
+  - link "Fleet Dashboard":
+    - /url: /dashboard
   - link "Pricing":
     - /url: /pricing
-  - link "Get Started":
-    - /url: /auth/signin
+  - button "D ⚒️ Development Smith over smith":
+    - text: D
+    - paragraph: ⚒️ Development Smith
+    - paragraph: over smith
+  - text: Welcome, Development Smith
+  - button "Sign Out"
 - main:
   - text: 1 Use Case 2 Components 3 Review 4 Quote
   - heading "Design Your Perfect Automation Solution" [level=1]

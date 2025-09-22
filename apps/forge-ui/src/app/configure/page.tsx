@@ -290,7 +290,40 @@ function ConfigureContent() {
                         ? 'border-blue-500 bg-blue-50' 
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
-                    onClick={() => setSelectedRobot(robot)}
+                    onClick={() => {
+                      setSelectedRobot(robot)
+                      
+                      // Trigger robot change in Isaac Sim
+                      const changeRobotInIsaacSim = async () => {
+                        try {
+                          const sessionId = localStorage.getItem('isaac_sim_session_id')
+                          if (!sessionId) {
+                            console.log('🤖 No Isaac Sim session ID available for robot change')
+                            return
+                          }
+                          
+                          const response = await fetch('http://localhost:8002/change_robot', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              session_id: sessionId,
+                              isaac_sim_robot: robot
+                            })
+                          })
+                          
+                          const result = await response.json()
+                          if (result.success) {
+                            console.log('🎉 Robot changed in Isaac Sim successfully:', result.robot_name)
+                          } else {
+                            console.error('❌ Failed to change robot in Isaac Sim:', result.error)
+                          }
+                        } catch (error) {
+                          console.error('❌ Robot change API call failed:', error)
+                        }
+                      }
+                      
+                      changeRobotInIsaacSim()
+                    }}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="text-2xl">🤖</div>
