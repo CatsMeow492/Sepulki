@@ -12,9 +12,15 @@ import numpy as np
 import sys
 import os
 
-# Add Isaac Sim to Python path
-isaac_sim_path = os.path.expanduser("~/isaac-sim/isaac-sim-2023.1.1")
+# Add Isaac Sim to Python path - use the host path (Isaac Sim container is accessible from host)
+isaac_sim_path = "/isaac-sim/kit/python"
 sys.path.insert(0, isaac_sim_path)
+
+# Also add the Isaac Sim extensions and modules
+sys.path.insert(0, "/isaac-sim/kit/exts")
+sys.path.insert(0, "/isaac-sim/kit/extscore")
+sys.path.insert(0, "/isaac-sim/kit/kernel")
+sys.path.insert(0, "/isaac-sim/exts")
 
 # Isaac Sim imports
 try:
