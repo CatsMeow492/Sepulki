@@ -40,7 +40,8 @@ LOCATIONS=(
     "/usr/local/isaac-sim"
 )
 
-for location in "${LOCATIONS[@]}"; do
+for location in "${LOCATIONS[@]}"
+do
     if [ -d "$location" ]; then
         echo "  ✅ Found Isaac Sim at: $location"
         ls -la "$location" | head -3
@@ -79,9 +80,9 @@ try:
     if omni_file is None:
         print('  ⚠️  Omni module found but __file__ is None (not properly installed)')
         print('  🔍 Checking omni module contents:')
-        print(f'    - omni.__name__: {getattr(omni, "__name__", "N/A")}')
-        print(f'    - omni.__package__: {getattr(omni, "__package__", "N/A")}')
-        print(f'    - dir(omni): {[x for x in dir(omni) if not x.startswith("_")][:5]}...')
+        print(f'    - omni.__name__: {getattr(omni, \"__name__\", \"N/A\")}')
+        print(f'    - omni.__package__: {getattr(omni, \"__package__\", \"N/A\")}')
+        print(f'    - dir(omni): {[x for x in dir(omni) if not x.startswith(\"_\")][:5]}...')
     else:
         print(f'  📍 Found omni module at: {omni_file}')
         omni_dir = os.path.dirname(omni_file)
@@ -96,55 +97,14 @@ try:
 except ImportError:
     print('  ❌ Omni module not found in current environment')
 
-# Check the actual Isaac Sim installation structure
-print('  🔍 Isaac Sim installation structure:')
-isaac_locations = [
-    "/home/shadeform/isaac-sim",
-    "/home/shadeform/isaac-sim/isaac-sim-2023.1.1"
-]
+# Test Isaac Sim import with correct path
+isaac_sim_base = '/home/shadeform/isaac-sim/isaac-sim-2023.1.1'
+sys.path.insert(0, isaac_sim_base)
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'exts'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'extscore'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'kernel'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'exts'))
 
-for location in isaac_locations:
-    import os
-    if os.path.isdir(location):
-        print(f"    📁 {location}:")
-        try:
-            # Check for omni directories
-            omni_dirs = []
-            for root, dirs, files in os.walk(location):
-                if 'omni' in dirs:
-                    omni_dirs.append(os.path.join(root, 'omni'))
-                if len(omni_dirs) >= 3:
-                    break
-            if omni_dirs:
-                for omni_dir in omni_dirs[:3]:
-                    print(f"      Omni dir: {omni_dir}")
-            else:
-                print("      No omni directories found")
-
-            # Check for Python files
-            py_files = []
-            for root, dirs, files in os.walk(location):
-                for file in files:
-                    if file.endswith('.py'):
-                        py_files.append(os.path.join(root, file))
-                        if len(py_files) >= 3:
-                            break
-                if len(py_files) >= 3:
-                    break
-            if py_files:
-                for py_file in py_files[:3]:
-                    print(f"      Python file: {py_file}")
-            else:
-                print("      No Python files found")
-        except Exception as e:
-            print(f"      Error scanning: {e}")
-
-# Test Isaac Sim import
-sys.path.insert(0, '/isaac-sim/kit/python')
-sys.path.insert(0, '/isaac-sim/kit/exts')
-sys.path.insert(0, '/isaac-sim/kit/extscore')
-sys.path.insert(0, '/isaac-sim/kit/kernel')
-sys.path.insert(0, '/isaac-sim/exts')
 try:
     from omni.isaac.kit import SimulationApp
     print('  ✅ Isaac Sim import successful before container start')
@@ -271,6 +231,7 @@ echo "  2. Test frontend at /configure page"
 echo "  3. Select robot recommendations to see photorealistic Isaac Sim rendering"
 echo "  4. Compare visual quality with previous OpenCV mock rendering"
 echo ""
-echo "🔍 Key Discovery: Isaac Sim is installed at /home/shadeform/isaac-sim/isaac-sim-2023.1.1"
-echo "   The omni module is importable but not properly installed as a Python package"
-echo "   This explains the conflicting detection messages - modules work but paths are wrong"
+echo "🔍 Key Discovery: Isaac Sim is pre-installed on this Brev instance"
+echo "   Location: /home/shadeform/isaac-sim/isaac-sim-2023.1.1"
+echo "   Status: Modules importable, but omni.__file__ is None (improper Python package installation)"
+echo "   Result: Real Isaac Sim rendering should now work with correct path configuration"
