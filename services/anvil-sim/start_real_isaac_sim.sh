@@ -155,13 +155,10 @@ for path in sys.path:
     if 'isaac' in path.lower():
         print(f'    - {path}')
 
-print('  🔍 Environment variables:')
-isaac_vars=\$(env | grep -i isaac || echo 'None found')
-if [ \"\$isaac_vars\" != \"None found\" ]; then
-    echo \"    \$isaac_vars\"
-else
-    echo '    None found'
-fi
+print('  🔍 Environment variables with isaac:')
+for key, value in os.environ.items():
+    if 'isaac' in key.lower():
+        print(f'    {key}={value}')
 
 print('  🧪 Testing Isaac Sim import...')
 # Use the correct Isaac Sim installation path
