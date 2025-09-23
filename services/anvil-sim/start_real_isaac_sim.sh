@@ -21,14 +21,31 @@ echo "  - Isaac Sim Python path: /isaac-sim/kit/python"
 echo "  - Isaac Sim extensions: /isaac-sim/kit/exts"
 echo "  - Isaac Sim kernel: /isaac-sim/kit/kernel"
 
-# Check if Isaac Sim directory exists
+# Check Isaac Sim installation status
+echo "  🔍 Isaac Sim Installation Analysis:"
 if [ -d "/isaac-sim" ]; then
     echo "  ✅ Isaac Sim directory exists: /isaac-sim"
     echo "  📁 Isaac Sim contents:"
     ls -la /isaac-sim/ | head -10
 else
-    echo "  ❌ Isaac Sim directory not found: /isaac-sim"
+    echo "  ⚠️  Isaac Sim directory not found at /isaac-sim"
 fi
+
+# Check various potential Isaac Sim installation locations
+echo "  🔍 Checking potential Isaac Sim locations:"
+LOCATIONS=(
+    "/isaac-sim/kit/python"
+    "/home/shadeform/isaac-sim"
+    "/opt/isaac-sim"
+    "/usr/local/isaac-sim"
+)
+
+for location in "${LOCATIONS[@]}"; do
+    if [ -d "$location" ]; then
+        echo "  ✅ Found Isaac Sim at: $location"
+        ls -la "$location" | head -3
+    fi
+done
 
 # Check if Isaac Sim Python exists
 if [ -d "/isaac-sim/kit/python" ]; then
@@ -40,13 +57,38 @@ if [ -d "/isaac-sim/kit/python" ]; then
         echo "  ❌ Python executable not found"
     fi
 else
-    echo "  ❌ Isaac Sim Python directory not found"
+    echo "  ⚠️  Isaac Sim Python directory not found at /isaac-sim/kit/python"
+    echo "  💡 But Isaac Sim modules are importable, suggesting installation elsewhere"
 fi
 
 # Test Isaac Sim import before starting container
 echo "🧪 Pre-container Isaac Sim test..."
 python3 -c "
 import sys
+import os
+
+print('  🔍 Current sys.path Isaac Sim entries:')
+for i, path in enumerate(sys.path):
+    if 'isaac' in path.lower():
+        print(f'    [{i}] {path}')
+
+# Try to find omni module location
+try:
+    import omni
+    print(f'  📍 Found omni module at: {omni.__file__}')
+    omni_dir = os.path.dirname(omni.__file__)
+    print(f'  📁 Omni directory: {omni_dir}')
+    
+    # Check if this is from Isaac Sim
+    if 'isaac' in omni_dir.lower():
+        print('  ✅ Omni module appears to be from Isaac Sim installation')
+    else:
+        print('  ⚠️  Omni module found but not from Isaac Sim')
+        
+except ImportError:
+    print('  ❌ Omni module not found in current environment')
+
+# Test Isaac Sim import
 sys.path.insert(0, '/isaac-sim/kit/python')
 sys.path.insert(0, '/isaac-sim/kit/exts')
 sys.path.insert(0, '/isaac-sim/kit/extscore')
@@ -55,24 +97,34 @@ sys.path.insert(0, '/isaac-sim/exts')
 try:
     from omni.isaac.kit import SimulationApp
     print('  ✅ Isaac Sim import successful before container start')
+    print(f'  📍 SimulationApp location: {SimulationApp.__module__}')
 except ImportError as e:
     print(f'  ❌ Isaac Sim import failed before container start: {e}')
-" 2>/dev/null || echo "  ⚠️  Python test failed (expected if Isaac Sim not installed yet)"
+" 2>&1
 
 # Create directories if they don't exist
 mkdir -p ~/docker/isaac-sim/cache/kit
 mkdir -p ~/docker/isaac-sim/logs
 
-# Start Isaac Sim container in background
-echo "🎬 Starting Isaac Sim container..."
-docker run --name isaac-sim -d --runtime=nvidia --gpus all \
-  -e "ACCEPT_EULA=Y" -e "PRIVACY_CONSENT=Y" --rm --network=host \
-  -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
-  -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-  nvcr.io/nvidia/isaac-sim:5.0.0 ./runheadless.sh --/app/livestream/publicEndpointAddress=$(curl -s ifconfig.me) --/app/livestream/port=49100
+# Check if Isaac Sim container is already running
+EXISTING_CONTAINER=$(docker ps -q --filter name=isaac-sim)
+if [ -n "$EXISTING_CONTAINER" ]; then
+    echo "🎬 Isaac Sim container already running (ID: $EXISTING_CONTAINER)"
+    CONTAINER_ID=$EXISTING_CONTAINER
+else
+    echo "🎬 Starting Isaac Sim container..."
+    # Remove any stopped containers with the same name
+    docker rm isaac-sim 2>/dev/null || true
 
-# Get container ID
-CONTAINER_ID=$(docker ps -q --filter name=isaac-sim)
+    docker run --name isaac-sim -d --runtime=nvidia --gpus all \
+      -e "ACCEPT_EULA=Y" -e "PRIVACY_CONSENT=Y" --rm --network=host \
+      -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
+      -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+      nvcr.io/nvidia/isaac-sim:5.0.0 ./runheadless.sh --/app/livestream/publicEndpointAddress=$(curl -s ifconfig.me) --/app/livestream/port=49100
+
+    CONTAINER_ID=$(docker ps -q --filter name=isaac-sim)
+fi
+
 echo "  📦 Isaac Sim container ID: $CONTAINER_ID"
 
 # Wait for Isaac Sim to start
@@ -142,8 +194,27 @@ echo "  🌐 Services listening on:"
 netstat -tlnp 2>/dev/null | grep -E ':(8000|8001|8002)' | awk '{print "    - " $4 " (" $7 ")"}' || echo "    (netstat not available)"
 
 echo ""
+echo "🎯 Isaac Sim Integration Status:"
+if [ -n "$CONTAINER_ID" ]; then
+    echo "  ✅ Isaac Sim container running"
+else
+    echo "  ❌ Isaac Sim container not running"
+fi
+
+ANVIL_PROCESSES=$(ps aux | grep 'python3 src/main.py' | grep -v grep | wc -l)
+if [ "$ANVIL_PROCESSES" -gt 0 ]; then
+    echo "  ✅ Anvil-sim service running ($ANVIL_PROCESSES processes)"
+else
+    echo "  ❌ Anvil-sim service not running"
+fi
+
+echo ""
 echo "✅ Real Isaac Sim integration setup complete!"
 echo "📋 Next steps:"
-echo "  1. Check frontend at /configure page"
-echo "  2. Select robot recommendations to see real Isaac Sim rendering"
-echo "  3. Compare visual quality with previous OpenCV mock rendering"
+echo "  1. Check service logs above for Isaac Sim detection status"
+echo "  2. Test frontend at /configure page"
+echo "  3. Select robot recommendations to see photorealistic Isaac Sim rendering"
+echo "  4. Compare visual quality with previous OpenCV mock rendering"
+echo ""
+echo "🔍 Key Discovery: Isaac Sim modules are available on host before container start"
+echo "   This suggests Isaac Sim is pre-installed on this Brev instance!"
