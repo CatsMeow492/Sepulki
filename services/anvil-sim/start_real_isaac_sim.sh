@@ -98,18 +98,46 @@ except ImportError:
 
 # Check the actual Isaac Sim installation structure
 print('  🔍 Isaac Sim installation structure:')
-ISAAC_LOCATIONS=(
-    "/home/shadeform/isaac-sim"
+isaac_locations = [
+    "/home/shadeform/isaac-sim",
     "/home/shadeform/isaac-sim/isaac-sim-2023.1.1"
-)
+]
 
-for location in "${ISAAC_LOCATIONS[@]}"; do
-    if [ -d "$location" ]; then
-        echo "    📁 $location:"
-        find "$location" -maxdepth 2 -name "omni" -type d 2>/dev/null | head -3 || echo "      No omni directories found"
-        find "$location" -maxdepth 2 -name "*.py" | head -3 || echo "      No Python files found"
-    fi
-done
+for location in isaac_locations:
+    import os
+    if os.path.isdir(location):
+        print(f"    📁 {location}:")
+        try:
+            # Check for omni directories
+            omni_dirs = []
+            for root, dirs, files in os.walk(location):
+                if 'omni' in dirs:
+                    omni_dirs.append(os.path.join(root, 'omni'))
+                if len(omni_dirs) >= 3:
+                    break
+            if omni_dirs:
+                for omni_dir in omni_dirs[:3]:
+                    print(f"      Omni dir: {omni_dir}")
+            else:
+                print("      No omni directories found")
+
+            # Check for Python files
+            py_files = []
+            for root, dirs, files in os.walk(location):
+                for file in files:
+                    if file.endswith('.py'):
+                        py_files.append(os.path.join(root, file))
+                        if len(py_files) >= 3:
+                            break
+                if len(py_files) >= 3:
+                    break
+            if py_files:
+                for py_file in py_files[:3]:
+                    print(f"      Python file: {py_file}")
+            else:
+                print("      No Python files found")
+        except Exception as e:
+            print(f"      Error scanning: {e}")
 
 # Test Isaac Sim import
 sys.path.insert(0, '/isaac-sim/kit/python')
@@ -243,5 +271,6 @@ echo "  2. Test frontend at /configure page"
 echo "  3. Select robot recommendations to see photorealistic Isaac Sim rendering"
 echo "  4. Compare visual quality with previous OpenCV mock rendering"
 echo ""
-echo "🔍 Key Discovery: Isaac Sim modules are available on host before container start"
-echo "   This suggests Isaac Sim is pre-installed on this Brev instance!"
+echo "🔍 Key Discovery: Isaac Sim is installed at /home/shadeform/isaac-sim/isaac-sim-2023.1.1"
+echo "   The omni module is importable but not properly installed as a Python package"
+echo "   This explains the conflicting detection messages - modules work but paths are wrong"
