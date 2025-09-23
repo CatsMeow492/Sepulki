@@ -4,11 +4,32 @@ Anvil Sim - Isaac Sim Integration Service
 Provides physics simulation, validation, and 3D scene management for Sepulki platform.
 """
 
+# Setup Isaac Sim paths BEFORE any imports
+import sys
+import os
+
+# Add Isaac Sim to Python path - use the container path for real Isaac Sim
+isaac_sim_path = "/isaac-sim/kit/python"
+sys.path.insert(0, isaac_sim_path)
+
+# Also add the Isaac Sim extensions and modules
+sys.path.insert(0, "/isaac-sim/kit/exts")
+sys.path.insert(0, "/isaac-sim/kit/extscore")
+sys.path.insert(0, "/isaac-sim/kit/kernel")
+sys.path.insert(0, "/isaac-sim/exts")
+
+# Now import Isaac Sim modules
+try:
+    from omni.isaac.kit import SimulationApp
+    ISAAC_SIM_AVAILABLE = True
+    print("✅ Isaac Sim modules imported successfully in anvil-sim service")
+except ImportError as e:
+    ISAAC_SIM_AVAILABLE = False
+    print(f"❌ Isaac Sim import failed in anvil-sim service: {e}")
+
 import asyncio
 import logging
-import os
 import signal
-import sys
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -17,7 +38,7 @@ from grpc import aio as grpc_aio
 from aiohttp import web
 
 # Import real Isaac Sim renderer
-from isaac_sim_real_renderer import get_isaac_sim_real_renderer, ISAAC_SIM_AVAILABLE
+from isaac_sim_real_renderer import get_isaac_sim_real_renderer
 
 from config.anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
 from services.simulation_service import SimulationServicer

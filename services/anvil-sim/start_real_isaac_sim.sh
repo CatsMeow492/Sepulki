@@ -13,11 +13,11 @@ mkdir -p ~/docker/isaac-sim/logs
 
 # Start Isaac Sim container in background
 echo "🎬 Starting Isaac Sim container..."
-docker run --name isaac-sim --entrypoint bash -it --runtime=nvidia --gpus all \
+docker run --name isaac-sim -d --runtime=nvidia --gpus all \
   -e "ACCEPT_EULA=Y" -e "PRIVACY_CONSENT=Y" --rm --network=host \
   -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
   -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-  nvcr.io/nvidia/isaac-sim:5.0.0 -c './runheadless.sh --/app/livestream/publicEndpointAddress=$(curl -s ifconfig.me) --/app/livestream/port=49100' &
+  nvcr.io/nvidia/isaac-sim:5.0.0 ./runheadless.sh --/app/livestream/publicEndpointAddress=$(curl -s ifconfig.me) --/app/livestream/port=49100
 
 # Wait for Isaac Sim to start
 echo "⏳ Waiting for Isaac Sim to initialize..."
@@ -39,6 +39,8 @@ except ImportError as e:
 # Start anvil-sim service
 echo "🔧 Starting anvil-sim service with real Isaac Sim..."
 cd ~/sepulki/services/anvil-sim
+
+# Run the service directly (it will now detect Isaac Sim)
 python3 src/main.py
 
 echo "✅ Real Isaac Sim integration complete!"
