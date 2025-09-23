@@ -17,13 +17,11 @@ import structlog
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-# Import video frame generator and media source
+# Import real Isaac Sim renderer
 import sys
 import os
 sys.path.append(os.path.dirname(__file__))
-from video_frame_generator import get_video_generator
-from media_source import create_media_source, close_media_source, MEDIA_AVAILABLE
-from test_video_generator import create_test_video_file, cleanup_test_video
+from isaac_sim_real_renderer import get_isaac_sim_real_renderer, ISAAC_SIM_AVAILABLE
 
 # Real aiortc for video streaming
 try:
@@ -62,10 +60,10 @@ class IsaacSimVideoTrack(VideoStreamTrack):
         self.client_id = client_id
         self.frame_counter = 0
         
-        # Initialize video generator only if WEBRTC is available
+        # Initialize real Isaac Sim renderer only if WEBRTC is available
         if WEBRTC_AVAILABLE:
-            self.video_generator = get_video_generator()
-            logger.info("🎬 Isaac Sim video track initialized", client_id=client_id)
+            self.isaac_sim_renderer = get_isaac_sim_real_renderer()
+            logger.info("🎬 Real Isaac Sim video track initialized", client_id=client_id)
             
             # CRITICAL: Start frame production immediately 
             self._start_frame_production()
@@ -112,8 +110,12 @@ class IsaacSimVideoTrack(VideoStreamTrack):
             logger.info("🎬 VIDEO TRACK RECV() CALLED!", 
                        client_id=self.client_id, pts=pts, time_base=time_base)
             
-            # Generate frame from Isaac Sim video generator  
-            frame_data = self.video_generator.generate_frame()
+            # Generate frame from real Isaac Sim renderer  
+            if ISAAC_SIM_AVAILABLE:
+                frame_data = await self.isaac_sim_renderer.render_frame()
+            else:
+                # Fallback to black frame if Isaac Sim not available
+                frame_data = np.zeros((1080, 1920, 3), dtype=np.uint8)
             
             logger.info("✅ Generated Isaac Sim frame", client_id=self.client_id, 
                        frame_shape=frame_data.shape, frame_dtype=frame_data.dtype)
@@ -514,12 +516,13 @@ class WebRTCStreamManager:
             "fov": data.get("fov", 50)
         }
         
-        # Update video generator with new camera position
-        get_video_generator().update_camera(
-            camera_data["position"],
-            camera_data["target"], 
-            camera_data["fov"]
-        )
+        # Update real Isaac Sim renderer with new camera position
+        if ISAAC_SIM_AVAILABLE:
+            self.isaac_sim_renderer.update_camera(
+                camera_data["position"],
+                camera_data["target"], 
+                camera_data["fov"]
+            )
         
         # Forward to Isaac Sim Manager
         if self.isaac_sim_manager:
@@ -545,8 +548,9 @@ class WebRTCStreamManager:
         
         joint_states = data.get("joint_states", {})
         
-        # Update video generator with new joint states
-        get_video_generator().update_joints(joint_states)
+        # Update real Isaac Sim renderer with new joint states
+        if ISAAC_SIM_AVAILABLE:
+            await self.isaac_sim_renderer.update_joints(joint_states)
         
         # Forward to Isaac Sim Manager
         if self.isaac_sim_manager:
@@ -657,8 +661,12 @@ class WebRTCStreamManager:
                 frame_count = 0
                 while client_id in self.clients:
                     try:
-                        # Generate frame
-                        frame_data = get_video_generator().generate_frame()
+                        # Generate frame from real Isaac Sim renderer
+                        if ISAAC_SIM_AVAILABLE:
+                            frame_data = await self.isaac_sim_renderer.render_frame()
+                        else:
+                            # Fallback to black frame if Isaac Sim not available
+                            frame_data = np.zeros((1080, 1920, 3), dtype=np.uint8)
                         
                         # Encode frame as JPEG
                         _, buffer = cv2.imencode('.jpg', frame_data, [

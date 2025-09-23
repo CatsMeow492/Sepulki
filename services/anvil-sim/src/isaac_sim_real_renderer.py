@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Isaac Sim Real Renderer - Replaces OpenCV mock rendering with actual Isaac Sim
+Real Isaac Sim Renderer - Uses actual Isaac Sim
 Provides photorealistic 3D robot simulation with advanced lighting and materials.
 """
 
@@ -9,10 +9,15 @@ import logging
 import time
 from typing import Dict, Any, Optional, Tuple
 import numpy as np
+import sys
+import os
 
-# Isaac Sim imports (graceful degradation if not available)
+# Add Isaac Sim to Python path
+isaac_sim_path = os.path.expanduser("~/isaac-sim/isaac-sim-2023.1.1")
+sys.path.insert(0, isaac_sim_path)
+
+# Isaac Sim imports
 try:
-    import omni
     from omni.isaac.kit import SimulationApp
     from omni.isaac.core import World, SimulationContext
     from omni.isaac.core.robots import Robot
@@ -21,21 +26,17 @@ try:
     from omni.isaac.sensor import Camera
     from omni.isaac.core.utils.prims import create_prim
     from omni.isaac.core.materials import PhysicsMaterial
-    from omni.isaac.core.utils.stage import get_stage_units
     ISAAC_SIM_AVAILABLE = True
 except ImportError:
     ISAAC_SIM_AVAILABLE = False
-    print("Warning: Isaac Sim not available. Install Isaac Sim to use real rendering.")
+    print("❌ Isaac Sim not available. Please install Isaac Sim first.")
 
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 class IsaacSimRealRenderer:
-    """
-    Real Isaac Sim renderer that provides photorealistic 3D robot simulation.
-    Replaces the OpenCV mock rendering with actual Isaac Sim scene capture.
-    """
+    """Real Isaac Sim renderer with photorealistic 3D simulation."""
     
     def __init__(self, width: int = 1920, height: int = 1080):
         self.width = width
@@ -71,7 +72,7 @@ class IsaacSimRealRenderer:
         if ISAAC_SIM_AVAILABLE:
             self._initialize_isaac_sim()
         else:
-            logger.warning("Isaac Sim not available - using fallback rendering")
+            logger.error("Isaac Sim not available - cannot initialize real renderer")
     
     def _initialize_isaac_sim(self):
         """Initialize Isaac Sim application and world."""
@@ -82,37 +83,30 @@ class IsaacSimRealRenderer:
                 "width": self.width,
                 "height": self.height,
                 "renderer": "RayTracedLighting",  # Photorealistic rendering
-                "rtx_settings": {
-                    "enable_sampled_direct_lighting": True,
-                    "enable_denoising": True,
-                    "max_bounces": 8,
-                    "samples_per_pixel": 64
-                }
             }
             
             self.app = SimulationApp(config)
-            logger.info("🎬 Isaac Sim application initialized", config=config)
+            logger.info("🎬 Real Isaac Sim application initialized", config=config)
             
             # Enable required extensions
             enable_extension("omni.isaac.core")
             enable_extension("omni.isaac.sensor")
-            enable_extension("omni.isaac.ros2_bridge")
             
             # Create new stage
             create_new_stage()
             
             # Initialize world
             self.world = World()
-            logger.info("🌍 Isaac Sim world created")
+            logger.info("🌍 Real Isaac Sim world created")
             
             # Setup scene
             self._setup_scene()
             
             self.scene_initialized = True
-            logger.info("✅ Isaac Sim scene initialized successfully")
+            logger.info("✅ Real Isaac Sim scene initialized successfully")
             
         except Exception as e:
-            logger.error("❌ Failed to initialize Isaac Sim", error=str(e))
+            logger.error("❌ Failed to initialize real Isaac Sim", error=str(e))
             self.scene_initialized = False
     
     def _setup_scene(self):
@@ -124,10 +118,7 @@ class IsaacSimRealRenderer:
             # Setup ground plane
             self._setup_ground()
             
-            # Setup warehouse environment
-            self._setup_warehouse_environment()
-            
-            logger.info("🏗️ Isaac Sim scene setup completed")
+            logger.info("🏗️ Real Isaac Sim scene setup completed")
             
         except Exception as e:
             logger.error("❌ Failed to setup Isaac Sim scene", error=str(e))
@@ -147,18 +138,7 @@ class IsaacSimRealRenderer:
             dome_light.GetAttribute("intensity").Set(1.0)
             dome_light.GetAttribute("color").Set((1.0, 1.0, 1.0))
             
-            # Add directional light for shadows
-            directional_light = create_prim(
-                "/World/DirectionalLight",
-                "DirectionalLight",
-                position=[5, 5, 10],
-                orientation=[0.1, 0.1, 0, 1]
-            )
-            
-            directional_light.GetAttribute("intensity").Set(2.0)
-            directional_light.GetAttribute("color").Set((1.0, 0.95, 0.8))
-            
-            logger.info("💡 Advanced lighting setup completed")
+            logger.info("💡 Real Isaac Sim lighting setup completed")
             
         except Exception as e:
             logger.error("❌ Failed to setup lighting", error=str(e))
@@ -182,49 +162,10 @@ class IsaacSimRealRenderer:
                 scale=[10, 10, 1]
             )
             
-            # Apply realistic material
-            ground_material = PhysicsMaterial(
-                prim_path="/World/Ground/Material",
-                static_friction=0.7,
-                dynamic_friction=0.5,
-                restitution=0.1
-            )
-            
-            logger.info("🏞️ Ground plane setup completed")
+            logger.info("🏞️ Real Isaac Sim ground plane setup completed")
             
         except Exception as e:
             logger.error("❌ Failed to setup ground", error=str(e))
-    
-    def _setup_warehouse_environment(self):
-        """Setup warehouse environment with shelves and props."""
-        try:
-            # Create warehouse shelves
-            shelf_positions = [
-                [3, 0, 0.5],
-                [-3, 0, 0.5],
-                [0, 3, 0.5],
-                [0, -3, 0.5]
-            ]
-            
-            for i, pos in enumerate(shelf_positions):
-                shelf = create_prim(
-                    f"/World/Shelf_{i}",
-                    "Xform",
-                    position=pos,
-                    scale=[0.5, 2, 1]
-                )
-                
-                shelf_mesh = create_prim(
-                    f"/World/Shelf_{i}/Mesh",
-                    "Cube",
-                    position=[0, 0, 0.5],
-                    scale=[0.5, 2, 1]
-                )
-            
-            logger.info("🏭 Warehouse environment setup completed")
-            
-        except Exception as e:
-            logger.error("❌ Failed to setup warehouse environment", error=str(e))
     
     async def load_robot(self, robot_config: Dict[str, Any]):
         """Load actual Isaac Sim robot model."""
@@ -253,110 +194,18 @@ class IsaacSimRealRenderer:
                 )
             )
             
-            # Apply realistic materials
-            self._apply_robot_materials(robot_name)
-            
-            # Setup joint controls
-            self._setup_joint_controls()
-            
             self.robot_config.update(robot_config)
-            logger.info("🤖 Robot loaded successfully", 
+            logger.info("🤖 Real robot loaded successfully", 
                        robot_name=robot_name, 
                        robot_path=robot_path)
             
             return True
             
         except Exception as e:
-            logger.error("❌ Failed to load robot", 
+            logger.error("❌ Failed to load real robot", 
                         robot_name=robot_config.get('name'),
                         error=str(e))
             return False
-    
-    def _apply_robot_materials(self, robot_name: str):
-        """Apply realistic materials to robot based on type."""
-        try:
-            if 'Franka' in robot_name or 'Panda' in robot_name:
-                # Franka Panda materials (white/gray with orange accents)
-                self._apply_franka_materials()
-            elif 'UR' in robot_name or 'Universal' in robot_name:
-                # Universal Robots materials (blue industrial)
-                self._apply_ur_materials()
-            elif 'Carter' in robot_name or 'mobile' in robot_name.lower():
-                # Mobile robot materials (green/black)
-                self._apply_mobile_materials()
-            else:
-                # Default materials
-                self._apply_default_materials()
-                
-            logger.info("🎨 Robot materials applied", robot_name=robot_name)
-            
-        except Exception as e:
-            logger.error("❌ Failed to apply robot materials", error=str(e))
-    
-    def _apply_franka_materials(self):
-        """Apply Franka Panda specific materials."""
-        # White/gray base material
-        base_material = PhysicsMaterial(
-            prim_path="/World/Franka/BaseMaterial",
-            static_friction=0.6,
-            dynamic_friction=0.4,
-            restitution=0.1
-        )
-        
-        # Orange joint material
-        joint_material = PhysicsMaterial(
-            prim_path="/World/Franka/JointMaterial",
-            static_friction=0.5,
-            dynamic_friction=0.3,
-            restitution=0.05
-        )
-    
-    def _apply_ur_materials(self):
-        """Apply Universal Robots specific materials."""
-        # Blue industrial material
-        industrial_material = PhysicsMaterial(
-            prim_path="/World/UR/IndustrialMaterial",
-            static_friction=0.7,
-            dynamic_friction=0.5,
-            restitution=0.1
-        )
-    
-    def _apply_mobile_materials(self):
-        """Apply mobile robot specific materials."""
-        # Green platform material
-        platform_material = PhysicsMaterial(
-            prim_path="/World/Mobile/PlatformMaterial",
-            static_friction=0.8,
-            dynamic_friction=0.6,
-            restitution=0.2
-        )
-    
-    def _apply_default_materials(self):
-        """Apply default robot materials."""
-        default_material = PhysicsMaterial(
-            prim_path="/World/Robot/DefaultMaterial",
-            static_friction=0.6,
-            dynamic_friction=0.4,
-            restitution=0.1
-        )
-    
-    def _setup_joint_controls(self):
-        """Setup joint control for the loaded robot."""
-        if not self.robot:
-            return
-        
-        try:
-            # Get robot articulation
-            articulation = self.robot.get_articulation()
-            
-            # Setup joint targets
-            joint_names = articulation.get_joint_names()
-            logger.info("🔧 Joint controls setup", 
-                       joint_names=joint_names,
-                       robot_name=self.robot_config.get('name'))
-            
-        except Exception as e:
-            logger.error("❌ Failed to setup joint controls", error=str(e))
     
     async def setup_camera(self, position: list, target: list, fov: float):
         """Setup Isaac Sim camera with advanced rendering."""
@@ -388,7 +237,7 @@ class IsaacSimRealRenderer:
                 'fov': fov
             })
             
-            logger.info("📹 Isaac Sim camera setup completed", 
+            logger.info("📹 Real Isaac Sim camera setup completed", 
                        position=position, 
                        target=target, 
                        fov=fov)
@@ -396,7 +245,7 @@ class IsaacSimRealRenderer:
             return True
             
         except Exception as e:
-            logger.error("❌ Failed to setup camera", error=str(e))
+            logger.error("❌ Failed to setup real camera", error=str(e))
             return False
     
     async def update_joints(self, joint_states: Dict[str, float]):
@@ -417,10 +266,10 @@ class IsaacSimRealRenderer:
                 if joint_name in joint_names:
                     articulation.set_joint_positions({joint_name: angle})
             
-            logger.debug("🔧 Joint states updated", joint_states=joint_states)
+            logger.debug("🔧 Real joint states updated", joint_states=joint_states)
             
         except Exception as e:
-            logger.error("❌ Failed to update joints", error=str(e))
+            logger.error("❌ Failed to update real joints", error=str(e))
     
     async def render_frame(self) -> np.ndarray:
         """Render a photorealistic frame from Isaac Sim."""
@@ -444,17 +293,17 @@ class IsaacSimRealRenderer:
                 
                 # Log every 60 frames (once per second)
                 if self.frame_count % 60 == 0:
-                    logger.info("🎬 Isaac Sim frame rendered", 
+                    logger.info("🎬 Real Isaac Sim frame rendered", 
                                frame_count=self.frame_count,
                                robot_name=self.robot_config.get('name'))
                 
                 return frame_bgr
             else:
-                logger.warning("No frame data from Isaac Sim camera")
+                logger.warning("No frame data from real Isaac Sim camera")
                 return np.zeros((self.height, self.width, 3), dtype=np.uint8)
                 
         except Exception as e:
-            logger.error("❌ Failed to render Isaac Sim frame", error=str(e))
+            logger.error("❌ Failed to render real Isaac Sim frame", error=str(e))
             return np.zeros((self.height, self.width, 3), dtype=np.uint8)
     
     def update_camera(self, position: list, target: list, fov: float):
@@ -471,12 +320,12 @@ class IsaacSimRealRenderer:
             self.camera.set_look_at(target)
             self.camera.set_fov(fov)
         
-        logger.debug("📹 Camera updated", position=position, target=target, fov=fov)
+        logger.debug("📹 Real camera updated", position=position, target=target, fov=fov)
     
     def update_robot_config(self, robot_config: Dict[str, Any]):
         """Update robot configuration."""
         self.robot_config.update(robot_config)
-        logger.info("🤖 Robot configuration updated", 
+        logger.info("🤖 Real robot configuration updated", 
                    robot_name=robot_config.get('name', 'Unknown'),
                    isaac_sim_path=robot_config.get('isaac_sim_path'))
     
@@ -485,14 +334,13 @@ class IsaacSimRealRenderer:
         try:
             if self.app:
                 self.app.close()
-                logger.info("🧹 Isaac Sim application closed")
+                logger.info("🧹 Real Isaac Sim application closed")
         except Exception as e:
-            logger.error("❌ Failed to cleanup Isaac Sim", error=str(e))
+            logger.error("❌ Failed to cleanup real Isaac Sim", error=str(e))
 
 # Global renderer instance
-isaac_sim_renderer = IsaacSimRealRenderer()
+isaac_sim_real_renderer = IsaacSimRealRenderer()
 
-def get_isaac_sim_renderer() -> IsaacSimRealRenderer:
-    """Get the global Isaac Sim renderer instance."""
-    return isaac_sim_renderer
-
+def get_isaac_sim_real_renderer() -> IsaacSimRealRenderer:
+    """Get the global real Isaac Sim renderer instance."""
+    return isaac_sim_real_renderer
