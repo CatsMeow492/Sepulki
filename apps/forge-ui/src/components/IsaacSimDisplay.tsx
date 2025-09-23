@@ -47,7 +47,21 @@ export function IsaacSimDisplay({
   const anvilSimPort = anvilSimUrl.port || (anvilSimUrl.protocol === 'https:' ? '443' : '80')
   const wsProtocol = anvilSimUrl.protocol === 'https:' ? 'wss:' : 'ws:'
   const httpBaseUrl = `${anvilSimUrl.protocol}//${anvilSimHost}:${anvilSimPort}`
-  const wsBaseUrl = `${wsProtocol}//${anvilSimHost}:${anvilSimPort}`
+
+  // Use separate WebSocket endpoint if provided (for tunneling like ngrok)
+  let wsUrl: string
+  if (env.anvilSimWebSocketEndpoint) {
+    // Handle ngrok TCP tunnel format: tcp://0.tcp.ngrok.io:12345 -> ws://0.tcp.ngrok.io:12345
+    if (env.anvilSimWebSocketEndpoint.startsWith('tcp://')) {
+      const tcpUrl = new URL(env.anvilSimWebSocketEndpoint)
+      wsUrl = `ws://${tcpUrl.hostname}:${tcpUrl.port}`
+    } else {
+      wsUrl = env.anvilSimWebSocketEndpoint
+    }
+  } else {
+    // Default: same host/port as HTTP but with ws/wss protocol
+    wsUrl = `${wsProtocol}//${anvilSimHost}:${anvilSimPort}`
+  }
   const [jointStates, setJointStates] = useState<Record<string, number>>({ 
     joint1: 0.2, 
     joint2: -0.3 
@@ -121,7 +135,7 @@ export function IsaacSimDisplay({
         // WebSocket video streaming will be started after connection
 
         // Establish WebSocket connection for controls
-        const ws = new WebSocket(`${wsBaseUrl.replace('8002', '8001')}`)
+        const ws = new WebSocket(`${wsUrl.replace('8002', '8001')}`)
 
         ws.onopen = () => {
           console.log('🔌 WebSocket connected to Isaac Sim')

@@ -10,6 +10,7 @@ export interface EnvironmentConfig {
   // API Configuration
   graphqlEndpoint: string
   anvilSimEndpoint: string
+  anvilSimWebSocketEndpoint?: string
 
   // Authentication
   useRealAuth: boolean
@@ -60,6 +61,10 @@ function createEnvironmentConfig(): EnvironmentConfig {
     process.env.ANVIL_SIM_ENDPOINT ||
     'http://localhost:8002'
 
+  // Separate WebSocket endpoint for tunneling (optional)
+  const anvilSimWebSocketEndpoint = process.env.NEXT_PUBLIC_ANVIL_SIM_WS_ENDPOINT ||
+    process.env.ANVIL_SIM_WS_ENDPOINT
+
   // Determine auth providers available
   const authProviders: string[] = []
   if (process.env.GITHUB_CLIENT_ID) authProviders.push('github')
@@ -77,6 +82,7 @@ function createEnvironmentConfig(): EnvironmentConfig {
     // API Configuration
     graphqlEndpoint,
     anvilSimEndpoint,
+    anvilSimWebSocketEndpoint,
     
     // Authentication
     useRealAuth,
@@ -107,6 +113,7 @@ if (env.isDevelopment) {
     auth: env.authProviders,
     graphql: env.graphqlEndpoint,
     anvilSim: env.anvilSimEndpoint,
+    anvilSimWS: env.anvilSimWebSocketEndpoint,
     mockAuth: shouldUseMockAuth(),
   })
 }
