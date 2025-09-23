@@ -175,10 +175,13 @@ try:
     print(f'  📍 SimulationApp module: {SimulationApp.__module__}')
 except ImportError as e:
     print(f'  ❌ Isaac Sim not accessible after container start: {e}')
-    print('  🔍 Checking container filesystem...')
-    docker exec isaac-sim ls -la /isaac-sim/kit/python/ 2>/dev/null | head -3 || echo '    Container filesystem not accessible'
+    print('  🔍 Container filesystem access will be checked after Python script completion')
     exit(1)
 " 2>&1
+
+# Additional container filesystem check
+echo "🔍 Container filesystem check:"
+docker exec isaac-sim ls -la /isaac-sim/kit/python/ 2>/dev/null | head -3 || echo "  ⚠️  Container filesystem not accessible"
 
 # Start anvil-sim service
 echo "🔧 Starting anvil-sim service with real Isaac Sim..."
