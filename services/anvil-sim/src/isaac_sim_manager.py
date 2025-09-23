@@ -38,7 +38,7 @@ except ImportError:
         def step_async(self): pass
         def reset(self): pass
 
-from config.anvil_config import (
+from ..config.anvil_config import (
     ISAAC_SIM_CONFIG, SIMULATION_ENVIRONMENTS, PERFORMANCE_SETTINGS,
     VALIDATION_SETTINGS, ASSET_PATHS
 )

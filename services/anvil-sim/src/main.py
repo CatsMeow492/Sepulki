@@ -59,18 +59,13 @@ from aiohttp import web
 # Import real Isaac Sim renderer
 from isaac_sim_real_renderer import get_isaac_sim_real_renderer
 
-# Import config directly
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'anvil_config.py')
-spec = importlib.util.spec_from_file_location("anvil_config", config_path)
-anvil_config = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(anvil_config)
+# Import config from parent directory
+from ..config.anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
 
-ISAAC_SIM_CONFIG = anvil_config.ISAAC_SIM_CONFIG
-GRPC_PORT = anvil_config.GRPC_PORT
-WEBSOCKET_PORT = anvil_config.WEBSOCKET_PORT
-from services.simulation_service import SimulationServicer
-from isaac_sim_manager import isaac_sim_manager
-from webrtc_stream_manager import webrtc_stream_manager
+# Import other modules
+from .services.simulation_service import SimulationServicer
+from .isaac_sim_manager import isaac_sim_manager
+from .webrtc_stream_manager import webrtc_stream_manager
 
 # Mock protocols for development
 try:
