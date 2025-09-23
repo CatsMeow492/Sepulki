@@ -75,18 +75,41 @@ for i, path in enumerate(sys.path):
 # Try to find omni module location
 try:
     import omni
-    print(f'  📍 Found omni module at: {omni.__file__}')
-    omni_dir = os.path.dirname(omni.__file__)
-    print(f'  📁 Omni directory: {omni_dir}')
-    
-    # Check if this is from Isaac Sim
-    if 'isaac' in omni_dir.lower():
-        print('  ✅ Omni module appears to be from Isaac Sim installation')
+    omni_file = getattr(omni, '__file__', None)
+    if omni_file is None:
+        print('  ⚠️  Omni module found but __file__ is None (not properly installed)')
+        print('  🔍 Checking omni module contents:')
+        print(f'    - omni.__name__: {getattr(omni, "__name__", "N/A")}')
+        print(f'    - omni.__package__: {getattr(omni, "__package__", "N/A")}')
+        print(f'    - dir(omni): {[x for x in dir(omni) if not x.startswith("_")][:5]}...')
     else:
-        print('  ⚠️  Omni module found but not from Isaac Sim')
-        
+        print(f'  📍 Found omni module at: {omni_file}')
+        omni_dir = os.path.dirname(omni_file)
+        print(f'  📁 Omni directory: {omni_dir}')
+
+        # Check if this is from Isaac Sim
+        if 'isaac' in omni_dir.lower():
+            print('  ✅ Omni module appears to be from Isaac Sim installation')
+        else:
+            print('  ⚠️  Omni module found but not from Isaac Sim')
+
 except ImportError:
     print('  ❌ Omni module not found in current environment')
+
+# Check the actual Isaac Sim installation structure
+print('  🔍 Isaac Sim installation structure:')
+ISAAC_LOCATIONS=(
+    "/home/shadeform/isaac-sim"
+    "/home/shadeform/isaac-sim/isaac-sim-2023.1.1"
+)
+
+for location in "${ISAAC_LOCATIONS[@]}"; do
+    if [ -d "$location" ]; then
+        echo "    📁 $location:"
+        find "$location" -maxdepth 2 -name "omni" -type d 2>/dev/null | head -3 || echo "      No omni directories found"
+        find "$location" -maxdepth 2 -name "*.py" | head -3 || echo "      No Python files found"
+    fi
+done
 
 # Test Isaac Sim import
 sys.path.insert(0, '/isaac-sim/kit/python')
@@ -163,17 +186,21 @@ else
 fi
 
 print('  🧪 Testing Isaac Sim import...')
-sys.path.insert(0, '/isaac-sim/kit/python')
-sys.path.insert(0, '/isaac-sim/kit/exts')
-sys.path.insert(0, '/isaac-sim/kit/extscore')
-sys.path.insert(0, '/isaac-sim/kit/kernel')
-sys.path.insert(0, '/isaac-sim/exts')
+# Use the correct Isaac Sim installation path
+isaac_sim_base = '/home/shadeform/isaac-sim/isaac-sim-2023.1.1'
+sys.path.insert(0, isaac_sim_base)
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'exts'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'extscore'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'kit', 'kernel'))
+sys.path.insert(0, os.path.join(isaac_sim_base, 'exts'))
+
 try:
     from omni.isaac.kit import SimulationApp
     print('  ✅ Isaac Sim accessible from host after container start!')
+    print(f'  📍 SimulationApp module: {SimulationApp.__module__}')
 except ImportError as e:
     print(f'  ❌ Isaac Sim not accessible after container start: {e}')
-    print('  🔍 Checking if container is exposing filesystem...')
+    print('  🔍 Checking container filesystem...')
     docker exec isaac-sim ls -la /isaac-sim/kit/python/ 2>/dev/null | head -3 || echo '    Container filesystem not accessible'
     exit(1)
 " 2>&1

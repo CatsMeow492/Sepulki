@@ -12,15 +12,15 @@ import numpy as np
 import sys
 import os
 
-# Add Isaac Sim to Python path - use the host path (Isaac Sim container is accessible from host)
-isaac_sim_path = "/isaac-sim/kit/python"
-sys.path.insert(0, isaac_sim_path)
+# Add Isaac Sim to Python path - use the correct host installation path
+isaac_sim_base = "/home/shadeform/isaac-sim/isaac-sim-2023.1.1"
+sys.path.insert(0, isaac_sim_base)
 
-# Also add the Isaac Sim extensions and modules
-sys.path.insert(0, "/isaac-sim/kit/exts")
-sys.path.insert(0, "/isaac-sim/kit/extscore")
-sys.path.insert(0, "/isaac-sim/kit/kernel")
-sys.path.insert(0, "/isaac-sim/exts")
+# Also add the Isaac Sim extensions and modules from the correct location
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "exts"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "extscore"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "kernel"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "exts"))
 
 # Isaac Sim imports
 try:

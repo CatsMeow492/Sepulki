@@ -8,15 +8,15 @@ Provides physics simulation, validation, and 3D scene management for Sepulki pla
 import sys
 import os
 
-# Add Isaac Sim to Python path - use the container path for real Isaac Sim
-isaac_sim_path = "/isaac-sim/kit/python"
-sys.path.insert(0, isaac_sim_path)
+# Isaac Sim is installed at /home/shadeform/isaac-sim/isaac-sim-2023.1.1
+isaac_sim_base = "/home/shadeform/isaac-sim/isaac-sim-2023.1.1"
+sys.path.insert(0, isaac_sim_base)
 
-# Also add the Isaac Sim extensions and modules
-sys.path.insert(0, "/isaac-sim/kit/exts")
-sys.path.insert(0, "/isaac-sim/kit/extscore")
-sys.path.insert(0, "/isaac-sim/kit/kernel")
-sys.path.insert(0, "/isaac-sim/exts")
+# Add the Isaac Sim extensions and modules from the correct location
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "exts"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "extscore"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "kernel"))
+sys.path.insert(0, os.path.join(isaac_sim_base, "exts"))
 
 # Now import Isaac Sim modules
 print("🔍 Anvil-sim service Isaac Sim detection:")
