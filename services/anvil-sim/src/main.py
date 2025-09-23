@@ -19,6 +19,14 @@ sys.path.insert(0, "/isaac-sim/kit/kernel")
 sys.path.insert(0, "/isaac-sim/exts")
 
 # Now import Isaac Sim modules
+print("🔍 Anvil-sim service Isaac Sim detection:")
+print(f"  📍 Python executable: {sys.executable}")
+print(f"  📍 Current working directory: {os.getcwd()}")
+print("  📍 Isaac Sim related sys.path entries:")
+for i, path in enumerate(sys.path):
+    if 'isaac' in path.lower():
+        print(f"    [{i}] {path}")
+
 try:
     from omni.isaac.kit import SimulationApp
     ISAAC_SIM_AVAILABLE = True
@@ -26,6 +34,16 @@ try:
 except ImportError as e:
     ISAAC_SIM_AVAILABLE = False
     print(f"❌ Isaac Sim import failed in anvil-sim service: {e}")
+    print("  🔍 Available modules in potential Isaac Sim paths:")
+    import glob
+    for path in ['/isaac-sim/kit/python/omni', '/isaac-sim/kit/exts/omni']:
+        if os.path.exists(path):
+            modules = glob.glob(os.path.join(path, '*'))
+            print(f"    {path}: {len(modules)} items")
+            for module in modules[:3]:  # Show first 3
+                print(f"      - {os.path.basename(module)}")
+        else:
+            print(f"    {path}: directory not found")
 
 import asyncio
 import logging
