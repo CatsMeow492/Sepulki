@@ -46,6 +46,7 @@ except ImportError as e:
             print(f"    {path}: directory not found")
 
 import asyncio
+import importlib.util
 import logging
 import signal
 from typing import Optional, Dict, Any
@@ -56,12 +57,20 @@ from grpc import aio as grpc_aio
 from aiohttp import web
 
 # Import real Isaac Sim renderer
-from isaac_sim_real_renderer import get_isaac_sim_real_renderer
+from src.isaac_sim_real_renderer import get_isaac_sim_real_renderer
 
-from config.anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
-from services.simulation_service import SimulationServicer
-from isaac_sim_manager import isaac_sim_manager
-from webrtc_stream_manager import webrtc_stream_manager
+# Import config directly
+config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'anvil_config.py')
+spec = importlib.util.spec_from_file_location("anvil_config", config_path)
+anvil_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(anvil_config)
+
+ISAAC_SIM_CONFIG = anvil_config.ISAAC_SIM_CONFIG
+GRPC_PORT = anvil_config.GRPC_PORT
+WEBSOCKET_PORT = anvil_config.WEBSOCKET_PORT
+from src.services.simulation_service import SimulationServicer
+from src.isaac_sim_manager import isaac_sim_manager
+from src.webrtc_stream_manager import webrtc_stream_manager
 
 # Mock protocols for development
 try:
@@ -196,15 +205,22 @@ class AnvilSimService:
             }
             
             self.active_sessions[session_id] = session
-            
+
             # Update real Isaac Sim renderer with robot configuration
             if isaac_sim_robot and ISAAC_SIM_AVAILABLE:
                 await self.isaac_sim_renderer.load_robot(isaac_sim_robot)
-                logger.info("Real Isaac Sim robot loaded", 
+                logger.info("Real Isaac Sim robot loaded",
                            robot_name=isaac_sim_robot.get('name'),
                            isaac_sim_path=isaac_sim_robot.get('isaac_sim_path'))
-                
-            logger.info("Isaac Sim session created", session_id=session_id, 
+
+            # Update video frame generator with robot configuration
+            if isaac_sim_robot:
+                self.video_frame_generator.update_robot_config(isaac_sim_robot)
+                logger.info("Video frame generator updated with robot config",
+                           session_id=session_id,
+                           robot_name=isaac_sim_robot.get('name'))
+
+            logger.info("Isaac Sim session created", session_id=session_id,
                        user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE,
                        robot_name=session.get('robot_name', 'Default Robot'))
             

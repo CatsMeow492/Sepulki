@@ -30,12 +30,18 @@ try:
     from omni.isaac.core.utils.extensions import enable_extension
     from omni.isaac.core.utils.stage import create_new_stage
     from omni.isaac.sensor import Camera
-    from omni.isaac.core.utils.prims import create_prim
+    try:
+        from omni.isaac.core.utils.prims import create_prim
+        CREATE_PRIM_AVAILABLE = True
+    except ImportError:
+        CREATE_PRIM_AVAILABLE = False
+        print("⚠️  create_prim not available, scene setup will be limited")
     from omni.isaac.core.materials import PhysicsMaterial
     ISAAC_SIM_AVAILABLE = True
     print("✅ Isaac Sim modules loaded successfully")
 except ImportError as e:
     ISAAC_SIM_AVAILABLE = False
+    CREATE_PRIM_AVAILABLE = False
     print(f"⚠️  Isaac Sim modules not available: {e}")
     print("   This is expected if Isaac Sim is not installed or not in PATH")
 
@@ -134,6 +140,10 @@ class IsaacSimRealRenderer:
     
     def _setup_lighting(self):
         """Setup advanced lighting for photorealistic rendering."""
+        if not CREATE_PRIM_AVAILABLE:
+            logger.warning("⚠️ Skipping lighting setup - create_prim not available")
+            return
+
         try:
             # Create dome light for environment lighting
             dome_light = create_prim(
@@ -142,18 +152,22 @@ class IsaacSimRealRenderer:
                 position=[0, 0, 0],
                 orientation=[0, 0, 0, 1]
             )
-            
+
             # Configure dome light
             dome_light.GetAttribute("intensity").Set(1.0)
             dome_light.GetAttribute("color").Set((1.0, 1.0, 1.0))
-            
+
             logger.info("💡 Real Isaac Sim lighting setup completed")
-            
+
         except Exception as e:
             logger.error("❌ Failed to setup lighting", error=str(e))
     
     def _setup_ground(self):
         """Setup ground plane with realistic materials."""
+        if not CREATE_PRIM_AVAILABLE:
+            logger.warning("⚠️ Skipping ground setup - create_prim not available")
+            return
+
         try:
             # Create ground plane
             ground = create_prim(
@@ -162,7 +176,7 @@ class IsaacSimRealRenderer:
                 position=[0, 0, 0],
                 scale=[10, 10, 1]
             )
-            
+
             # Add ground mesh
             ground_mesh = create_prim(
                 "/World/Ground/Mesh",
@@ -170,9 +184,9 @@ class IsaacSimRealRenderer:
                 position=[0, 0, 0],
                 scale=[10, 10, 1]
             )
-            
+
             logger.info("🏞️ Real Isaac Sim ground plane setup completed")
-            
+
         except Exception as e:
             logger.error("❌ Failed to setup ground", error=str(e))
     
