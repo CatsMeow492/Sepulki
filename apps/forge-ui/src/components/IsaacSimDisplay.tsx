@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Loader2, Zap, AlertCircle, Pause, Play, RotateCcw, Camera, Maximize, Minimize, Eye, Move, Target } from 'lucide-react'
 import type { RobotSpec } from '@/types/robot'
+import { env } from '@/lib/env'
 
 interface RobotConfig {
   selectedRobot?: any // IsaacSimRobot type
@@ -39,6 +40,14 @@ export function IsaacSimDisplay({
   const [connectionState, setConnectionState] = useState<'checking' | 'connecting' | 'connected' | 'error'>('checking')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [websocket, setWebsocket] = useState<WebSocket | null>(null)
+
+  // Extract host and port from anvil-sim endpoint
+  const anvilSimUrl = new URL(env.anvilSimEndpoint)
+  const anvilSimHost = anvilSimUrl.hostname
+  const anvilSimPort = anvilSimUrl.port || (anvilSimUrl.protocol === 'https:' ? '443' : '80')
+  const wsProtocol = anvilSimUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  const httpBaseUrl = `${anvilSimUrl.protocol}//${anvilSimHost}:${anvilSimPort}`
+  const wsBaseUrl = `${wsProtocol}//${anvilSimHost}:${anvilSimPort}`
   const [jointStates, setJointStates] = useState<Record<string, number>>({ 
     joint1: 0.2, 
     joint2: -0.3 
@@ -76,13 +85,13 @@ export function IsaacSimDisplay({
         setConnectionState('connecting')
         
         // Check Isaac Sim service health
-        const healthResponse = await fetch('http://localhost:8002/health')
+        const healthResponse = await fetch(`${httpBaseUrl}/health`)
         if (!healthResponse.ok) {
           throw new Error('Isaac Sim service not available')
         }
 
         // Create session
-        const sessionResponse = await fetch('http://localhost:8002/create_scene', {
+        const sessionResponse = await fetch(`${httpBaseUrl}/create_scene`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -112,7 +121,7 @@ export function IsaacSimDisplay({
         // WebSocket video streaming will be started after connection
 
         // Establish WebSocket connection for controls
-        const ws = new WebSocket('ws://localhost:8001')
+        const ws = new WebSocket(`${wsBaseUrl.replace('8002', '8001')}`)
 
         ws.onopen = () => {
           console.log('🔌 WebSocket connected to Isaac Sim')

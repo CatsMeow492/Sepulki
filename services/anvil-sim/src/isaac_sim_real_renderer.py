@@ -33,9 +33,11 @@ try:
     from omni.isaac.core.utils.prims import create_prim
     from omni.isaac.core.materials import PhysicsMaterial
     ISAAC_SIM_AVAILABLE = True
-except ImportError:
+    print("✅ Isaac Sim modules loaded successfully")
+except ImportError as e:
     ISAAC_SIM_AVAILABLE = False
-    print("❌ Isaac Sim not available. Please install Isaac Sim first.")
+    print(f"⚠️  Isaac Sim modules not available: {e}")
+    print("   This is expected if Isaac Sim is not installed or not in PATH")
 
 import structlog
 
@@ -74,11 +76,12 @@ class IsaacSimRealRenderer:
             'specifications': {}
         }
         
-        # Initialize Isaac Sim if available
-        if ISAAC_SIM_AVAILABLE:
+        # Try to initialize Isaac Sim
+        try:
             self._initialize_isaac_sim()
-        else:
-            logger.error("Isaac Sim not available - cannot initialize real renderer")
+        except Exception as e:
+            logger.warning(f"Isaac Sim initialization failed, falling back to mock rendering: {e}")
+            self.scene_initialized = False
     
     def _initialize_isaac_sim(self):
         """Initialize Isaac Sim application and world."""

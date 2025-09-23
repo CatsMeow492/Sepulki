@@ -9,7 +9,8 @@ export interface EnvironmentConfig {
   
   // API Configuration
   graphqlEndpoint: string
-  
+  anvilSimEndpoint: string
+
   // Authentication
   useRealAuth: boolean
   authProviders: string[]
@@ -47,12 +48,17 @@ function createEnvironmentConfig(): EnvironmentConfig {
   const useRealAuth = isProduction || !!process.env.GITHUB_CLIENT_ID || !!process.env.GOOGLE_CLIENT_ID
   
   // Auto-detect GraphQL endpoint
-  const graphqlEndpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 
-    (isProduction 
-      ? (process.env.VERCEL_URL 
+  const graphqlEndpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
+    (isProduction
+      ? (process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}/api/graphql`
           : '/api/graphql')
       : 'http://localhost:4000/graphql')
+
+  // Anvil Sim service endpoint (defaults to Brev instance if available)
+  const anvilSimEndpoint = process.env.NEXT_PUBLIC_ANVIL_SIM_ENDPOINT ||
+    process.env.ANVIL_SIM_ENDPOINT ||
+    'http://localhost:8002'
 
   // Determine auth providers available
   const authProviders: string[] = []
@@ -70,6 +76,7 @@ function createEnvironmentConfig(): EnvironmentConfig {
     
     // API Configuration
     graphqlEndpoint,
+    anvilSimEndpoint,
     
     // Authentication
     useRealAuth,
@@ -99,6 +106,7 @@ if (env.isDevelopment) {
     platform: env.deploymentPlatform,
     auth: env.authProviders,
     graphql: env.graphqlEndpoint,
+    anvilSim: env.anvilSimEndpoint,
     mockAuth: shouldUseMockAuth(),
   })
 }
