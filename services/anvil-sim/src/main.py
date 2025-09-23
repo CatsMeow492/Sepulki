@@ -18,6 +18,10 @@ sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "extscore"))
 sys.path.insert(0, os.path.join(isaac_sim_base, "kit", "kernel"))
 sys.path.insert(0, os.path.join(isaac_sim_base, "exts"))
 
+# Add config directory to path
+config_dir = os.path.join(os.path.dirname(__file__), '..', 'config')
+sys.path.insert(0, config_dir)
+
 # Now import Isaac Sim modules
 print("🔍 Anvil-sim service Isaac Sim detection:")
 print(f"  📍 Python executable: {sys.executable}")
@@ -59,13 +63,13 @@ from aiohttp import web
 # Import real Isaac Sim renderer
 from isaac_sim_real_renderer import get_isaac_sim_real_renderer
 
-# Import config from parent directory
-from ..config.anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
+# Import config
+from anvil_config import ISAAC_SIM_CONFIG, GRPC_PORT, WEBSOCKET_PORT
 
 # Import other modules
-from .services.simulation_service import SimulationServicer
-from .isaac_sim_manager import isaac_sim_manager
-from .webrtc_stream_manager import webrtc_stream_manager
+from services.simulation_service import SimulationServicer
+from isaac_sim_manager import isaac_sim_manager
+from webrtc_stream_manager import webrtc_stream_manager
 
 # Mock protocols for development
 try:
