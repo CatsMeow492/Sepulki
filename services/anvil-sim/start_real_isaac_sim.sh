@@ -33,20 +33,10 @@ fi
 
 # Check various potential Isaac Sim installation locations
 echo "  🔍 Checking potential Isaac Sim locations:"
-LOCATIONS=(
-    "/isaac-sim/kit/python"
-    "/home/shadeform/isaac-sim"
-    "/opt/isaac-sim"
-    "/usr/local/isaac-sim"
-)
-
-for location in "${LOCATIONS[@]}"
-do
-    if [ -d "$location" ]; then
-        echo "  ✅ Found Isaac Sim at: $location"
-        ls -la "$location" | head -3
-    fi
-done
+echo "  ✅ Known Isaac Sim location: /home/shadeform/isaac-sim"
+if [ -d "/home/shadeform/isaac-sim" ]; then
+    ls -la "/home/shadeform/isaac-sim" | head -3
+fi
 
 # Check if Isaac Sim Python exists
 if [ -d "/isaac-sim/kit/python" ]; then
