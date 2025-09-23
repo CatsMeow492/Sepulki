@@ -40,28 +40,8 @@ export function IsaacSimDisplay({
   const [connectionState, setConnectionState] = useState<'checking' | 'connecting' | 'connected' | 'error'>('checking')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [websocket, setWebsocket] = useState<WebSocket | null>(null)
-
-  // Extract host and port from anvil-sim endpoint
-  const anvilSimUrl = new URL(env.anvilSimEndpoint)
-  const anvilSimHost = anvilSimUrl.hostname
-  const anvilSimPort = anvilSimUrl.port || (anvilSimUrl.protocol === 'https:' ? '443' : '80')
-  const wsProtocol = anvilSimUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-  const httpBaseUrl = `${anvilSimUrl.protocol}//${anvilSimHost}:${anvilSimPort}`
-
-  // Use separate WebSocket endpoint if provided (for tunneling like ngrok)
-  let wsUrl: string
-  if (env.anvilSimWebSocketEndpoint) {
-    // Handle ngrok TCP tunnel format: tcp://0.tcp.ngrok.io:12345 -> ws://0.tcp.ngrok.io:12345
-    if (env.anvilSimWebSocketEndpoint.startsWith('tcp://')) {
-      const tcpUrl = new URL(env.anvilSimWebSocketEndpoint)
-      wsUrl = `ws://${tcpUrl.hostname}:${tcpUrl.port}`
-    } else {
-      wsUrl = env.anvilSimWebSocketEndpoint
-    }
-  } else {
-    // Default: same host/port as HTTP but with ws/wss protocol
-    wsUrl = `${wsProtocol}//${anvilSimHost}:${anvilSimPort}`
-  }
+  const [videoStreamWorking, setVideoStreamWorking] = useState(false)
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
   const [jointStates, setJointStates] = useState<Record<string, number>>({ 
     joint1: 0.2, 
     joint2: -0.3 
@@ -75,17 +55,21 @@ export function IsaacSimDisplay({
   const [showPhysics, setShowPhysics] = useState(enablePhysics)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showCameraControls, setShowCameraControls] = useState(false)
-  const [videoStreamWorking, setVideoStreamWorking] = useState(false)
   const [cameraState, setCameraState] = useState({
     position: { x: 4, y: 4, z: 4 },
     target: { x: 0, y: 0, z: 0 },
     fov: 50
   })
+
+    // Use port-forwarded Brev anvil-sim service endpoint
+    const anvilSimHost = 'localhost'
+    const anvilSimPort = '8002'
+    const httpBaseUrl = `http://${anvilSimHost}:${anvilSimPort}`
+    const wsUrl = `ws://${anvilSimHost}:8001`  // WebSocket on port 8001
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const animationRef = useRef<number>()
   const initRef = useRef(false)
 
@@ -132,9 +116,33 @@ export function IsaacSimDisplay({
         
         console.log('✅ Isaac Sim Display session created:', newSessionId)
 
-        // WebSocket video streaming will be started after connection
+        // Initialize WebRTC peer connection for video streaming
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        })
+        setPeerConnection(pc)
 
-        // Establish WebSocket connection for controls
+        // Handle incoming video stream
+        pc.ontrack = (event) => {
+          console.log('📹 Received video track from Isaac Sim')
+          if (videoRef.current && event.streams[0]) {
+            videoRef.current.srcObject = event.streams[0]
+            setVideoStreamWorking(true)
+          }
+        }
+
+        // Handle ICE candidates
+        pc.onicecandidate = (event) => {
+          if (event.candidate && ws) {
+            ws.send(JSON.stringify({
+              type: 'ice_candidate',
+              session_id: newSessionId,
+              candidate: event.candidate
+            }))
+          }
+        }
+
+        // Establish WebSocket connection for controls and WebRTC signaling
         const ws = new WebSocket(`${wsUrl.replace('8002', '8001')}`)
 
         ws.onopen = () => {
@@ -151,7 +159,7 @@ export function IsaacSimDisplay({
           console.log('👋 Join session message sent to Isaac Sim')
         }
 
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
           const data = JSON.parse(event.data)
           console.log('📨 Isaac Sim message:', data.type, data)
 
@@ -159,19 +167,61 @@ export function IsaacSimDisplay({
             setConnectionState('connected')
             console.log('✅ Isaac Sim WebSocket connection established for controls')
             
-            // Request WebSocket video streaming
+            // Start WebRTC video streaming
             ws.send(JSON.stringify({
-              type: 'start_video_stream',
+              type: 'start_webrtc_stream',
               session_id: newSessionId
             }))
-            console.log('🎬 Requested WebSocket video streaming')
+            console.log('🎬 Requested WebRTC video streaming')
+            
+            // Fallback: Also request WebSocket video streaming after 3 seconds if no WebRTC offer
+            setTimeout(() => {
+              if (!videoStreamWorking) {
+                console.log('🔄 WebRTC not working, falling back to WebSocket video streaming')
+                ws.send(JSON.stringify({
+                  type: 'start_video_stream',
+                  session_id: newSessionId
+                }))
+              }
+            }, 3000)
+            
+          } else if (data.type === 'webrtc_offer') {
+            // Handle WebRTC offer from Isaac Sim
+            console.log('📹 Received WebRTC offer from Isaac Sim')
+            ;(async () => {
+              try {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+                const answer = await pc.createAnswer()
+                await pc.setLocalDescription(answer)
+                
+                ws.send(JSON.stringify({
+                  type: 'webrtc_answer',
+                  session_id: newSessionId,
+                  answer: answer
+                }))
+                console.log('📹 Sent WebRTC answer to Isaac Sim')
+              } catch (error) {
+                console.error('❌ WebRTC offer handling error:', error)
+              }
+            })()
+            
+          } else if (data.type === 'ice_candidate') {
+            // Handle ICE candidate from Isaac Sim
+            ;(async () => {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+                console.log('📹 Added ICE candidate from Isaac Sim')
+              } catch (error) {
+                console.error('❌ ICE candidate error:', error)
+              }
+            })()
             
           } else if (data.type === 'video_stream_started') {
             console.log('✅ WebSocket video stream started')
             setVideoStreamWorking(true)
             
           } else if (data.type === 'video_frame') {
-            // Display video frame via Canvas (fixes browser video element content-type rejection)
+            // Display video frame via Canvas (fallback when WebRTC fails)
             if (canvasRef.current && data.frame_data) {
               try {
                 const canvas = canvasRef.current
@@ -181,6 +231,8 @@ export function IsaacSimDisplay({
                 // Create image from base64 data
                 const img = new Image()
                 img.onload = () => {
+                  console.log('🖼️ Image loaded successfully:', img.width, 'x', img.height)
+                  
                   // Set canvas size to match image
                   canvas.width = img.width
                   canvas.height = img.height
@@ -189,14 +241,28 @@ export function IsaacSimDisplay({
                   ctx.clearRect(0, 0, canvas.width, canvas.height)
                   ctx.drawImage(img, 0, 0)
                   
+                  console.log('🎨 Canvas drawn with image:', canvas.width, 'x', canvas.height)
+                  
+                  // Verify canvas has content
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+                  const data = imageData.data
+                  let nonBlackPixels = 0
+                  for (let i = 0; i < data.length; i += 4) {
+                    if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0) {
+                      nonBlackPixels++
+                    }
+                  }
+                  console.log('📊 Canvas content after draw:', nonBlackPixels, 'non-black pixels out of', data.length / 4)
+                  
                   setVideoStreamWorking(true)
                 }
                 
-                img.onerror = () => {
-                  console.error('❌ Failed to load video frame image')
+                img.onerror = (error) => {
+                  console.error('❌ Failed to load video frame image:', error)
                   setVideoStreamWorking(false)
                 }
                 
+                console.log('🔄 Setting image src with base64 data length:', data.frame_data.length)
                 img.src = `data:image/jpeg;base64,${data.frame_data}`
                 
                 // Log every 30 frames (every 2 seconds at 15 FPS)
@@ -245,9 +311,9 @@ export function IsaacSimDisplay({
         websocket.close()
         setWebsocket(null)
       }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close()
-        peerConnectionRef.current = null
+      if (peerConnection) {
+        peerConnection.close()
+        setPeerConnection(null)
       }
     }
   }, [])
@@ -445,23 +511,22 @@ export function IsaacSimDisplay({
           : `rounded-lg ${className}`
       }`}
     >
-      {/* Hidden WebRTC Video (muted by browser) */}
-      {/* Isaac Sim WebSocket Video Stream via Canvas (fixes content-type issue) */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full object-cover"
-        style={{ display: 'block', zIndex: 10, position: 'relative' }}
-      />
-      
-      {/* Hidden Video Element (WebSocket frames render to Canvas instead) */}
+      {/* WebRTC Video Stream from Isaac Sim */}
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
-        style={{ display: 'none' }}
+        style={{ display: 'block', zIndex: 10, position: 'relative' }}
         autoPlay
         muted
         playsInline
         controls={false}
+      />
+      
+      {/* Fallback Canvas for WebSocket frames (if WebRTC fails) */}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full object-cover"
+        style={{ display: videoStreamWorking ? 'none' : 'block', zIndex: 10, position: 'relative' }}
       />
 
       {/* Professional Isaac Sim HUD */}

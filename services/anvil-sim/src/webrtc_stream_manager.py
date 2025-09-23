@@ -200,6 +200,10 @@ class WebRTCStreamManager:
         self.websocket_server = None
         self.running = False
         
+        # Initialize video frame generator for WebSocket streaming
+        from video_frame_generator import IsaacSimVideoGenerator
+        self.video_frame_generator = IsaacSimVideoGenerator()
+        
         # STUN/TURN servers for WebRTC connectivity  
         if WEBRTC_AVAILABLE:
             self.rtc_config = RTCConfiguration(
@@ -352,7 +356,7 @@ class WebRTCStreamManager:
         if message_type == "offer":
             await self._handle_webrtc_offer(client_id, data)
             
-        elif message_type == "answer":
+        elif message_type == "webrtc_answer":
             await self._handle_webrtc_answer(client_id, data)
             
         elif message_type == "ice_candidate":
@@ -372,6 +376,8 @@ class WebRTCStreamManager:
             
         elif message_type == "start_video_stream":
             await self._start_video_stream(client_id, data)
+        elif message_type == "start_webrtc_stream":
+            await self._start_webrtc_stream(client_id, data)
             
         else:
             logger.warning("Unknown message type", 
@@ -458,19 +464,20 @@ class WebRTCStreamManager:
     async def _handle_webrtc_answer(self, client_id: str, data: Dict[str, Any]):
         """Handle WebRTC answer from client."""
         client = self.clients.get(client_id)
-        if not client:
+        if not client or not hasattr(client, 'peer_connection') or not client.peer_connection:
+            logger.warning("No peer connection found for client", client_id=client_id)
             return
         
         try:
-            sdp = data.get("sdp")
-            if not sdp:
+            answer_data = data.get("answer")
+            if not answer_data:
+                logger.warning("No answer data in WebRTC answer message", client_id=client_id)
                 return
                 
             if WEBRTC_AVAILABLE:
-                remote_desc = RTCSessionDescription(sdp, "answer")
+                remote_desc = RTCSessionDescription(answer_data.get("sdp"), answer_data.get("type", "answer"))
                 await client.peer_connection.setRemoteDescription(remote_desc)
-            
-            logger.info("WebRTC answer handled", client_id=client_id)
+                logger.info("✅ WebRTC answer set on peer connection", client_id=client_id)
             
         except Exception as e:
             logger.error("Failed to handle WebRTC answer", 
@@ -661,12 +668,8 @@ class WebRTCStreamManager:
                 frame_count = 0
                 while client_id in self.clients:
                     try:
-                        # Generate frame from real Isaac Sim renderer
-                        if ISAAC_SIM_AVAILABLE:
-                            frame_data = await self.isaac_sim_renderer.render_frame()
-                        else:
-                            # Fallback to black frame if Isaac Sim not available
-                            frame_data = np.zeros((1080, 1920, 3), dtype=np.uint8)
+                        # Generate frame from video frame generator (works regardless of Isaac Sim availability)
+                        frame_data = self.video_frame_generator.generate_frame()
                         
                         # Encode frame as JPEG
                         _, buffer = cv2.imencode('.jpg', frame_data, [
@@ -720,6 +723,53 @@ class WebRTCStreamManager:
             await self._send_to_client(client_id, {
                 'type': 'error',
                 'message': f'Video stream failed: {str(e)}'
+            })
+    
+    async def _start_webrtc_stream(self, client_id: str, data: Dict[str, Any]):
+        """Start WebRTC video streaming for a client."""
+        if not WEBRTC_AVAILABLE:
+            await self._send_to_client(client_id, {
+                'type': 'error',
+                'message': 'WebRTC not available - falling back to WebSocket streaming'
+            })
+            return
+        
+        try:
+            logger.info("🎬 Starting WebRTC video stream", client_id=client_id)
+            
+            # Create WebRTC peer connection
+            pc = RTCPeerConnection(configuration=self.rtc_config)
+            
+            # Store peer connection in client for answer handling
+            client = self.clients.get(client_id)
+            if client:
+                client.peer_connection = pc
+            
+            # Create video track from Isaac Sim
+            video_track = IsaacSimVideoTrack(client_id)
+            pc.addTrack(video_track)
+            
+            # Create offer
+            offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            
+            # Send offer to client
+            await self._send_to_client(client_id, {
+                'type': 'webrtc_offer',
+                'offer': {
+                    'sdp': offer.sdp,
+                    'type': offer.type
+                }
+            })
+            
+            logger.info("✅ WebRTC offer sent to client", client_id=client_id)
+            
+        except Exception as e:
+            logger.error("Failed to start WebRTC stream", 
+                        client_id=client_id, error=str(e))
+            await self._send_to_client(client_id, {
+                'type': 'error',
+                'message': f'WebRTC stream failed: {str(e)}'
             })
     
     def get_streaming_metrics(self) -> List[StreamMetrics]:

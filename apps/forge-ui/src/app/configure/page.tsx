@@ -99,6 +99,8 @@ function ConfigureContent() {
     
     // Extract Isaac Sim robot recommendations from analysis
     const robots = extractRobotRecommendations(storedAnalysis);
+    console.log('🤖 Extracted robots from analysis:', robots);
+    console.log('📄 Analysis text preview:', storedAnalysis.substring(0, 200));
     setRecommendedRobots(robots);
     
     // Select the first recommended robot as default

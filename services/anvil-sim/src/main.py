@@ -96,6 +96,10 @@ class AnvilSimService:
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
         self.isaac_sim_renderer = get_isaac_sim_real_renderer()
         
+        # Initialize video frame generator for WebSocket streaming
+        from video_frame_generator import IsaacSimVideoGenerator
+        self.video_frame_generator = IsaacSimVideoGenerator()
+        
     async def initialize_isaac_sim(self):
         """Initialize Isaac Sim simulation application using Real Isaac Sim Renderer."""
         try:
@@ -270,6 +274,16 @@ class AnvilSimService:
                         'success': False,
                         'error': f'Failed to update visual simulation: {str(e)}'
                     }, status=500)
+            
+            # Update video frame generator with new robot configuration
+            try:
+                self.video_frame_generator.update_robot_config(isaac_sim_robot)
+                logger.info("Video frame generator updated with new robot", 
+                           session_id=session_id,
+                           robot_name=isaac_sim_robot.get('name'))
+            except Exception as e:
+                logger.error("Failed to update video frame generator", 
+                            session_id=session_id, error=str(e))
             
             return web.json_response({
                 'success': True,

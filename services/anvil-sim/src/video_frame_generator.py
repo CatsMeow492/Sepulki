@@ -100,10 +100,19 @@ class IsaacSimVideoGenerator:
         self.frame_count += 1
         self.sim_time += 1.0 / 60.0  # 60 FPS simulation time
         
+        # Debug: Check if frame has any non-black pixels
+        non_black_pixels = np.count_nonzero(frame)
+        total_pixels = frame.size
+        
         # Log every 60 frames (once per second)
         if self.frame_count % 60 == 0:
             logger.info("Video frame generated", frame_count=self.frame_count, 
-                       robot_name=self.robot_config.get('name', 'Unknown'))
+                       robot_name=self.robot_config.get('name', 'Unknown'),
+                       non_black_pixels=non_black_pixels,
+                       total_pixels=total_pixels,
+                       frame_shape=frame.shape,
+                       frame_min=frame.min(),
+                       frame_max=frame.max())
         
         return frame
         
@@ -111,31 +120,37 @@ class IsaacSimVideoGenerator:
         """Render camera-dependent background."""
         # Different backgrounds based on camera position
         cam_x, cam_y, cam_z = self.camera['position']
-        
+
+        logger.debug("Rendering background", cam_x=cam_x, cam_y=cam_y, cam_z=cam_z, frame_shape=frame.shape)
+
         if cam_z > 4:  # Front view
             # Blue gradient
             for y in range(self.height):
                 color_factor = y / self.height
                 color = [int(20 + color_factor * 30), int(30 + color_factor * 40), int(60 + color_factor * 80)]
                 frame[y, :] = color
-        elif cam_y > 4:  # Top view  
+            logger.debug("Applied front view blue gradient")
+        elif cam_y > 4:  # Top view
             # Gray gradient
             for y in range(self.height):
                 color_factor = y / self.height
                 color = [int(40 + color_factor * 20), int(40 + color_factor * 20), int(40 + color_factor * 20)]
                 frame[y, :] = color
+            logger.debug("Applied top view gray gradient")
         elif abs(cam_x) > 4:  # Side view
             # Warm gradient
             for y in range(self.height):
                 color_factor = y / self.height
                 color = [int(60 + color_factor * 40), int(30 + color_factor * 20), int(20 + color_factor * 10)]
                 frame[y, :] = color
+            logger.debug("Applied side view warm gradient")
         else:  # Isometric
             # Default Isaac Sim gradient
             for y in range(self.height):
                 color_factor = y / self.height
                 color = [int(15 + color_factor * 20), int(25 + color_factor * 30), int(35 + color_factor * 40)]
                 frame[y, :] = color
+            logger.debug("Applied isometric default gradient")
                 
     def _render_grid(self, frame: np.ndarray):
         """Render perspective grid (changes with camera distance)."""
@@ -187,19 +202,27 @@ class IsaacSimVideoGenerator:
         center_y = int(self.height / 2 - cam_y * 10)
         
         robot_name = self.robot_config.get('name', 'Default Robot')
-        
+
+        logger.debug("Rendering robot", robot_name=robot_name, center_x=center_x, center_y=center_y, scale=scale, cam_distance=cam_distance)
+
         # Render different robot types based on configuration
         if 'Franka' in robot_name or 'Panda' in robot_name:
+            logger.debug("Rendering Franka Panda robot")
             self._render_franka_panda(frame, center_x, center_y, scale)
         elif 'UR5' in robot_name or 'UR10' in robot_name:
+            logger.debug("Rendering Universal Robot")
             self._render_universal_robot(frame, center_x, center_y, scale)
         elif 'KUKA' in robot_name or 'KR210' in robot_name:
+            logger.debug("Rendering KUKA robot")
             self._render_kuka_robot(frame, center_x, center_y, scale)
         elif 'Carter' in robot_name or 'mobile' in robot_name.lower():
+            logger.debug("Rendering mobile robot")
             self._render_mobile_robot(frame, center_x, center_y, scale)
         elif 'TurtleBot' in robot_name:
+            logger.debug("Rendering TurtleBot")
             self._render_turtlebot(frame, center_x, center_y, scale)
         else:
+            logger.debug("Rendering generic robot arm")
             # Default generic robot arm
             self._render_generic_arm(frame, center_x, center_y, scale)
             
