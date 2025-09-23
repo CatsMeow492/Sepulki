@@ -101,11 +101,43 @@ function ConfigureContent() {
     const robots = extractRobotRecommendations(storedAnalysis);
     console.log('🤖 Extracted robots from analysis:', robots);
     console.log('📄 Analysis text preview:', storedAnalysis.substring(0, 200));
-    setRecommendedRobots(robots);
+
+    // TEMP: Force some robots for testing video functionality
+    const testRobots = [
+      {
+        id: 'franka_panda',
+        name: 'Franka Emika Panda',
+        category: 'collaborative' as const,
+        manufacturer: 'Franka Emika',
+        description: 'Collaborative 7-DOF robot arm designed for human-robot interaction',
+        isaac_sim_path: '/NVIDIA/Assets/Isaac/4.5/Isaac/Robots/Franka/franka.usd',
+        urdf_path: '/robots/franka_panda/panda.urdf',
+        usd_path: '/robots/franka_panda/panda.usd',
+        specifications: {
+          payload_kg: 3,
+          reach_m: 0.855,
+          repeatability_mm: 0.1,
+          dof: 7,
+          workspace_description: 'Spherical workspace with full orientation'
+        },
+        use_cases: ['assembly', 'packaging', 'quality inspection'],
+        environments: ['warehouse', 'factory', 'lab'] as const,
+        isaac_sim_features: {
+          physics_simulation: true,
+          collision_detection: true,
+          force_feedback: true,
+          path_planning: true,
+          vision_integration: true
+        }
+      }
+    ];
+
+    setRecommendedRobots(testRobots.length > 0 ? testRobots : robots);
     
     // Select the first recommended robot as default
-    if (robots.length > 0) {
-      setSelectedRobot(robots[0]);
+    const finalRobots = testRobots.length > 0 ? testRobots : robots;
+    if (finalRobots.length > 0) {
+      setSelectedRobot(finalRobots[0]);
       
       // Generate Isaac Sim configuration
       const config = generateIsaacSimConfiguration(robots, storedInput);

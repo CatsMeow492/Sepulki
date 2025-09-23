@@ -72,6 +72,7 @@ export function IsaacSimDisplay({
   const containerRef = useRef<HTMLDivElement>(null)
   const animationRef = useRef<number>()
   const initRef = useRef(false)
+  const lastFrameRef = useRef<HTMLImageElement | null>(null)
 
   // Initialize Isaac Sim connection and WebRTC
   useEffect(() => {
@@ -123,11 +124,27 @@ export function IsaacSimDisplay({
         setPeerConnection(pc)
 
         // Handle incoming video stream
-        pc.ontrack = (event) => {
+        pc.ontrack = async (event) => {
           console.log('📹 Received video track from Isaac Sim')
           if (videoRef.current && event.streams[0]) {
             videoRef.current.srcObject = event.streams[0]
-            setVideoStreamWorking(true)
+
+            // Show video element, hide canvas
+            videoRef.current.style.display = 'block'
+            if (canvasRef.current) {
+              canvasRef.current.style.display = 'none'
+            }
+
+            // Explicitly play the video after setting srcObject
+            try {
+              await videoRef.current.play()
+              console.log('▶️ Video started playing')
+              setVideoStreamWorking(true)
+            } catch (playError) {
+              console.error('❌ Failed to play video:', playError)
+              // Still set working to true even if autoplay fails
+              setVideoStreamWorking(true)
+            }
           }
         }
 
@@ -166,24 +183,7 @@ export function IsaacSimDisplay({
           if (data.type === 'connection_established') {
             setConnectionState('connected')
             console.log('✅ Isaac Sim WebSocket connection established for controls')
-            
-            // Start WebRTC video streaming
-            ws.send(JSON.stringify({
-              type: 'start_webrtc_stream',
-              session_id: newSessionId
-            }))
-            console.log('🎬 Requested WebRTC video streaming')
-            
-            // Fallback: Also request WebSocket video streaming after 3 seconds if no WebRTC offer
-            setTimeout(() => {
-              if (!videoStreamWorking) {
-                console.log('🔄 WebRTC not working, falling back to WebSocket video streaming')
-                ws.send(JSON.stringify({
-                  type: 'start_video_stream',
-                  session_id: newSessionId
-                }))
-              }
-            }, 3000)
+            // Wait for user to click "Start Video" button
             
           } else if (data.type === 'webrtc_offer') {
             // Handle WebRTC offer from Isaac Sim
@@ -217,64 +217,77 @@ export function IsaacSimDisplay({
             })()
             
           } else if (data.type === 'video_stream_started') {
-            console.log('✅ WebSocket video stream started')
+            console.log('✅ WebSocket video stream started (fallback)')
             setVideoStreamWorking(true)
-            
-          } else if (data.type === 'video_frame') {
-            // Display video frame via Canvas (fallback when WebRTC fails)
-            if (canvasRef.current && data.frame_data) {
-              try {
-                const canvas = canvasRef.current
-                const ctx = canvas.getContext('2d')
-                if (!ctx) return
-                
-                // Create image from base64 data
-                const img = new Image()
-                img.onload = () => {
-                  console.log('🖼️ Image loaded successfully:', img.width, 'x', img.height)
-                  
-                  // Set canvas size to match image
-                  canvas.width = img.width
-                  canvas.height = img.height
-                  
-                  // Clear and draw the frame
-                  ctx.clearRect(0, 0, canvas.width, canvas.height)
-                  ctx.drawImage(img, 0, 0)
-                  
-                  console.log('🎨 Canvas drawn with image:', canvas.width, 'x', canvas.height)
-                  
-                  // Verify canvas has content
-                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-                  const data = imageData.data
-                  let nonBlackPixels = 0
-                  for (let i = 0; i < data.length; i += 4) {
-                    if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0) {
-                      nonBlackPixels++
-                    }
-                  }
-                  console.log('📊 Canvas content after draw:', nonBlackPixels, 'non-black pixels out of', data.length / 4)
-                  
-                  setVideoStreamWorking(true)
-                }
-                
-                img.onerror = (error) => {
-                  console.error('❌ Failed to load video frame image:', error)
-                  setVideoStreamWorking(false)
-                }
-                
-                console.log('🔄 Setting image src with base64 data length:', data.frame_data.length)
-                img.src = `data:image/jpeg;base64,${data.frame_data}`
-                
-                // Log every 30 frames (every 2 seconds at 15 FPS)
-                if (data.frame_count % 30 === 0) {
-                  console.log(`📹 Isaac Sim Canvas frame #${data.frame_count} - Robot: ${robotConfig?.selectedRobot?.name || 'Default'}`)
-                }
-              } catch (error) {
-                console.error('❌ Canvas frame processing error:', error)
-                setVideoStreamWorking(false)
-              }
+
+            // Show canvas for WebSocket streaming, hide video element
+            if (videoRef.current) {
+              videoRef.current.style.display = 'none'
             }
-            
+            if (canvasRef.current) {
+              canvasRef.current.style.display = 'block'
+            }
+
+      } else if (data.type === 'video_frame') {
+        // Display video frame on canvas for WebSocket streaming
+        if (canvasRef.current && data.frame_data) {
+          try {
+            const canvas = canvasRef.current
+            const ctx = canvas.getContext('2d')
+            if (!ctx) return
+
+            console.log('🔄 Processing video frame:', data.frame_count, 'base64 length:', data.frame_data.length)
+
+            // Create image from base64 data
+            const img = new Image()
+            img.onload = () => {
+              console.log('🖼️ Canvas image loaded successfully:', img.width, 'x', img.height)
+
+              // Store the loaded image for persistence
+              lastFrameRef.current = img
+
+              // Set canvas size to match image if needed
+              if (canvas.width !== img.width || canvas.height !== img.height) {
+                canvas.width = img.width
+                canvas.height = img.height
+                console.log('📐 Resized canvas to:', canvas.width, 'x', canvas.height)
+              }
+
+              // Clear and draw the frame
+              ctx.clearRect(0, 0, canvas.width, canvas.height)
+              ctx.drawImage(img, 0, 0)
+
+              console.log('🎨 Canvas updated with frame:', canvas.width, 'x', canvas.height)
+
+              // Check if canvas now has content
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+              const data = imageData.data
+              let nonBlackPixels = 0
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0) {
+                  nonBlackPixels++
+                }
+              }
+              console.log(`📊 Canvas content check: ${nonBlackPixels} non-black pixels out of ${data.length / 4} total`)
+            }
+
+            img.onerror = (error) => {
+              console.error('❌ Failed to load video frame image:', error, 'data length:', data.frame_data.length)
+              console.error('❌ Image src attempted:', `data:image/jpeg;base64,${data.frame_data.substring(0, 50)}...`)
+            }
+
+            console.log('🔄 Setting canvas image src with base64 data length:', data.frame_data.length)
+            img.src = `data:image/jpeg;base64,${data.frame_data}`
+
+            // Log every 30 frames (every 2 seconds at 15 FPS)
+            if (data.frame_count && data.frame_count % 30 === 0) {
+              console.log(`📹 Isaac Sim Canvas frame #${data.frame_count} - Robot: ${robotConfig?.selectedRobot?.name || 'Default'}`)
+            }
+          } catch (error) {
+            console.error('❌ Canvas frame processing error:', error)
+          }
+        }
+
           } else if (data.type === 'joint_update_response') {
             if (data.joint_states) {
               setJointStates(data.joint_states)
@@ -405,8 +418,39 @@ export function IsaacSimDisplay({
     return () => clearTimeout(timeoutId)
   }, [cameraState, sessionId, websocket])
 
-  // Canvas video display is now handled directly by video frame events
-  // (No useEffect needed - Canvas updated via WebSocket frames)
+  // Video stream is handled via WebRTC with user interaction
+
+  // Start video stream with user interaction
+  const startVideoStream = async () => {
+    if (!websocket || !peerConnection || connectionState !== 'connected') {
+      console.error('❌ Cannot start video stream: not connected')
+      return
+    }
+
+    try {
+      console.log('🎬 Starting WebRTC video stream with user interaction')
+
+      // Request WebRTC video streaming from server
+      websocket.send(JSON.stringify({
+        type: 'start_webrtc_stream',
+        session_id: sessionId
+      }))
+
+      // Set a timeout to check if WebRTC works, otherwise fallback
+      setTimeout(() => {
+        if (!videoStreamWorking) {
+          console.log('🔄 WebRTC not working after user interaction, falling back to WebSocket')
+          websocket.send(JSON.stringify({
+            type: 'start_video_stream',
+            session_id: sessionId
+          }))
+        }
+      }, 3000)
+
+    } catch (error) {
+      console.error('❌ Failed to start video stream:', error)
+    }
+  }
 
   // Fullscreen functionality
   const toggleFullscreen = async () => {
@@ -459,6 +503,52 @@ export function IsaacSimDisplay({
     return () => document.removeEventListener('keydown', handleKeyPress)
   }, [isFullscreen, toggleFullscreen])
 
+  // Redraw last frame if canvas gets cleared (e.g., during hot reload)
+  useEffect(() => {
+    const redrawLastFrame = () => {
+      const canvas = canvasRef.current
+      if (!canvas || !lastFrameRef.current) return false
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return false
+
+      const img = lastFrameRef.current
+      if (canvas.width === img.width && canvas.height === img.height) {
+        // Check if canvas is empty (all black/transparent)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+        let hasContent = false
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i] !== 0 || data[i + 1] !== 0 || data[i + 2] !== 0 || data[i + 3] !== 0) {
+            hasContent = true
+            break
+          }
+        }
+
+        if (!hasContent) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+          ctx.drawImage(img, 0, 0)
+          console.log('🔄 Redrew last frame after canvas reset')
+          return true
+        }
+      }
+      return false
+    }
+
+    // Try to redraw immediately
+    redrawLastFrame()
+
+    // Set up periodic check in case canvas gets cleared later
+    const interval = setInterval(() => {
+      if (redrawLastFrame()) {
+        // Successfully redrew, can stop checking for now
+        clearInterval(interval)
+      }
+    }, 1000) // Check every second
+
+    return () => clearInterval(interval)
+  }, [])
+
   // Error state
   if (connectionState === 'error') {
     return (
@@ -483,18 +573,89 @@ export function IsaacSimDisplay({
     )
   }
 
-  // Loading state
-  if (connectionState === 'checking' || connectionState === 'connecting') {
+  // TEMP: Always show connection UI for testing video functionality
+  const showConnectionUI = true
+
+  if (showConnectionUI) {
     return (
       <div className={`bg-gray-900 rounded-lg flex items-center justify-center ${className}`}>
-        <div className="text-center text-white">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-yellow-500" />
-          <div className="text-lg font-medium mb-2">
-            {connectionState === 'checking' ? 'Checking Isaac Sim' : 'Connecting to Isaac Sim'}
+        <div className="text-center text-white max-w-md">
+          <div className="mb-6">
+            <div className="text-4xl mb-4">🎬</div>
+            <h3 className="text-xl font-bold mb-2">Isaac Sim Video Stream</h3>
+            <p className="text-gray-300 mb-4">
+              Connect to live Isaac Sim physics simulation and robot visualization
+            </p>
           </div>
-          <div className="text-sm text-gray-400">
-            {connectionState === 'checking' ? 'Verifying service...' : 'Initializing physics simulation...'}
+
+          {/* Connection Status */}
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Status:</span>
+              <span className={`text-sm font-bold ${
+                (connectionState as string) === 'connected' ? 'text-green-400' :
+                (connectionState as string) === 'connecting' ? 'text-yellow-400' :
+                (connectionState as string) === 'error' ? 'text-red-400' : 'text-gray-400'
+              }`}>
+                {(connectionState as string) === 'connected' ? '✅ Connected' :
+                 (connectionState as string) === 'connecting' ? '🔄 Connecting' :
+                 (connectionState as string) === 'error' ? '❌ Error' : '⏳ Checking'}
+              </span>
+            </div>
+
+            <div className="space-y-1 text-xs text-gray-400">
+              <div>Environment: {environment}</div>
+              <div>Quality: {qualityProfile}</div>
+              <div>WebSocket: {connectionState === 'connected' ? '🔌 Connected' : '🔌 Disconnected'}</div>
+              <div>Video: {videoStreamWorking ? '🎥 Active' : '🎥 Inactive'}</div>
+            </div>
           </div>
+
+          {/* Start Video Button */}
+          {!videoStreamWorking && (
+            <button
+              onClick={startVideoStream}
+              disabled={connectionState !== 'connected'}
+              className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
+                connectionState === 'connected'
+                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl'
+                  : 'bg-gray-600 cursor-not-allowed opacity-50'
+              }`}
+            >
+              🎬 Start Isaac Sim Video
+            </button>
+          )}
+
+          {/* Video Element (shown when streaming) */}
+          {videoStreamWorking && (
+            <div className="mt-4 w-full">
+              <div className="text-sm text-gray-300 mb-2">Live Isaac Sim Stream:</div>
+              <video
+                ref={videoRef}
+                className="w-full h-48 bg-black rounded border border-gray-600"
+                autoPlay
+                muted
+                playsInline
+                controls={false}
+              />
+            </div>
+          )}
+
+          {/* Canvas for WebSocket video frames (when WebRTC fails) */}
+          {videoStreamWorking && (
+            <canvas
+              ref={canvasRef}
+              className="w-full h-48 bg-black rounded border border-gray-600 mt-4"
+              style={{ display: 'none' }} // Hidden by default, shown if WebRTC fails
+            />
+          )}
+
+          {/* Error Message */}
+          {(connectionState as string) === 'error' && (
+            <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-200 text-sm">
+              Failed to connect to Isaac Sim. Please check that the service is running.
+            </div>
+          )}
         </div>
       </div>
     )
@@ -515,19 +676,34 @@ export function IsaacSimDisplay({
       <video
         ref={videoRef}
         className="w-full h-full object-cover"
-        style={{ display: 'block', zIndex: 10, position: 'relative' }}
+        style={{ display: videoStreamWorking ? 'block' : 'none', zIndex: 10, position: 'relative' }}
         autoPlay
         muted
         playsInline
         controls={false}
       />
-      
-      {/* Fallback Canvas for WebSocket frames (if WebRTC fails) */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full object-cover"
-        style={{ display: videoStreamWorking ? 'none' : 'block', zIndex: 10, position: 'relative' }}
-      />
+
+      {/* Start Video Button for User Interaction */}
+      {!videoStreamWorking && connectionState === 'connected' && (
+        <div className="absolute inset-0 flex items-center justify-center z-20">
+          <button
+            onClick={startVideoStream}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg shadow-lg transition-colors"
+          >
+            🎬 Start Isaac Sim Video
+          </button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {!videoStreamWorking && (connectionState as string) === 'connecting' && (
+        <div className="absolute inset-0 flex items-center justify-center z-20">
+          <div className="bg-black/80 text-white p-6 rounded-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+            Connecting to Isaac Sim...
+          </div>
+        </div>
+      )}
 
       {/* Professional Isaac Sim HUD */}
       <div className="absolute top-4 left-4 z-5">

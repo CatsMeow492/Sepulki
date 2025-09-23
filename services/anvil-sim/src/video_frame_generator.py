@@ -148,7 +148,8 @@ class IsaacSimVideoGenerator:
             # Default Isaac Sim gradient
             for y in range(self.height):
                 color_factor = y / self.height
-                color = [int(15 + color_factor * 20), int(25 + color_factor * 30), int(35 + color_factor * 40)]
+                # Much brighter background so robots are clearly visible
+                color = [int(80 + color_factor * 40), int(90 + color_factor * 50), int(100 + color_factor * 60)]
                 frame[y, :] = color
             logger.debug("Applied isometric default gradient")
                 
@@ -167,26 +168,26 @@ class IsaacSimVideoGenerator:
             
     def _render_warehouse_environment(self, frame: np.ndarray):
         """Render warehouse shelving and floor."""
-        # Floor (bottom 15%)
+        # Floor (bottom 15%) - brighter for visibility
         floor_y = int(self.height * 0.85)
-        cv2.rectangle(frame, (0, floor_y), (self.width, self.height), (50, 50, 50), -1)
+        cv2.rectangle(frame, (0, floor_y), (self.width, self.height), (120, 120, 120), -1)
         
         # Warehouse shelving (perspective based on camera)
         cam_x = self.camera['position'][0]
         shelf_offset = int(cam_x * 20)  # Parallax effect
         
-        # Left shelf
-        cv2.rectangle(frame, (100 + shelf_offset, int(self.height * 0.3)), 
-                     (120 + shelf_offset, int(self.height * 0.85)), (80, 80, 80), -1)
-        
-        # Right shelf  
+        # Left shelf - brighter for visibility
+        cv2.rectangle(frame, (100 + shelf_offset, int(self.height * 0.3)),
+                     (120 + shelf_offset, int(self.height * 0.85)), (140, 140, 140), -1)
+
+        # Right shelf - brighter for visibility
         cv2.rectangle(frame, (200 + shelf_offset, int(self.height * 0.3)),
-                     (220 + shelf_offset, int(self.height * 0.85)), (80, 80, 80), -1)
-        
-        # Shelf levels
+                     (220 + shelf_offset, int(self.height * 0.85)), (140, 140, 140), -1)
+
+        # Shelf levels - brighter for visibility
         for level in [0.4, 0.5, 0.6, 0.7]:
             y = int(self.height * level)
-            cv2.rectangle(frame, (100 + shelf_offset, y), (220 + shelf_offset, y + 8), (100, 100, 100), -1)
+            cv2.rectangle(frame, (100 + shelf_offset, y), (220 + shelf_offset, y + 8), (160, 160, 160), -1)
             
     def _render_robot(self, frame: np.ndarray):
         """Render robot with current joint positions (specific to selected robot model)."""
