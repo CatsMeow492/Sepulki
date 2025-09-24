@@ -53,6 +53,7 @@ import asyncio
 import importlib.util
 import logging
 import signal
+import traceback
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -177,7 +178,9 @@ class AnvilSimService:
     async def create_scene(self, request):
         """Create Isaac Sim session endpoint for frontend compatibility."""
         try:
+            logger.info("Creating Isaac Sim scene", request_method=request.method)
             data = await request.json()
+            logger.debug("Received create_scene data", data_keys=list(data.keys()))
             
             session_id = f"session_{int(datetime.utcnow().timestamp())}_{len(self.active_sessions)}"
             
@@ -237,6 +240,7 @@ class AnvilSimService:
                        user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE,
                        robot_name=session.get('robot_name', 'Default Robot'))
             
+            logger.info("Isaac Sim session created successfully", session_id=session_id)
             return web.json_response({
                 'success': True,
                 'session_id': session_id,
@@ -245,14 +249,14 @@ class AnvilSimService:
                 'isaac_sim_available': ISAAC_SIM_AVAILABLE,
                 'webrtc_ready': True
             })
-            
+
         except Exception as e:
-            logger.error("Failed to create Isaac Sim session", error=str(e))
+            logger.error("Failed to create Isaac Sim session", error=str(e), traceback=traceback.format_exc())
             return web.json_response({
                 'success': False,
                 'error': str(e),
                 'message': 'Failed to create Isaac Sim session'
-            }, status=400)
+            }, status=500)
 
     async def change_robot(self, request):
         """Change robot model in existing Isaac Sim session."""
