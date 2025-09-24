@@ -203,7 +203,7 @@ export default function IsaacSimVideoOnly({ className = '' }: IsaacSimVideoOnlyP
       </div>
 
       <div className="mt-4 text-xs text-gray-500 text-center">
-        <div>WebSocket: ws://localhost:8765</div>
+              <div>WebSocket: ws://localhost:8765 (via SSH tunnel)</div>
         <div>Streaming from Isaac Sim container</div>
       </div>
     </div>
