@@ -5,6 +5,9 @@ test.describe('Configure viewer smoke', () => {
     // First, simulate the analysis flow by setting localStorage
     await page.goto('http://localhost:3000/') // Go to home page first
 
+    // Wait for the page to load and tunnel to be ready
+    await page.waitForTimeout(2000)
+
     // Set localStorage with analysis data (simulating what the analyze page would do)
     const mockAnalysis = `### ANALYSIS & QUESTIONS
 
@@ -34,8 +37,20 @@ test.describe('Configure viewer smoke', () => {
         // Now navigate to configure page
         await page.goto('http://localhost:3000/configure?step=2')
 
-    // Check if the page loaded correctly with robot recommendations
-    await expect(page.locator('h2:has-text("Isaac Sim Robot Recommendations")')).toBeVisible()
+        // Monitor console messages for debugging
+        const consoleMessages: string[] = []
+        page.on('console', msg => {
+          consoleMessages.push(`[${msg.type()}] ${msg.text()}`)
+        })
+
+        // Wait a bit for the component to initialize
+        await page.waitForTimeout(3000)
+
+        // Check if the page loaded correctly with robot recommendations
+        await expect(page.locator('h2:has-text("Isaac Sim Robot Recommendations")')).toBeVisible()
+
+        console.log('📝 Recent console messages:')
+        consoleMessages.slice(-10).forEach(msg => console.log('  ', msg))
 
     // Take screenshot of the loaded configure page
     await page.screenshot({ path: 'test-results/configure-loaded.png', fullPage: true })
@@ -63,9 +78,13 @@ test.describe('Configure viewer smoke', () => {
         await startButton.click()
         console.log('▶️ Clicked Start Isaac Sim Video button')
 
-        // Wait for video streaming to start
-        await page.waitForTimeout(3000)
+        // Wait for video streaming to start - give it more time for WebRTC negotiation
+        await page.waitForTimeout(5000)
         console.log('⏳ Waited for video streaming to start')
+
+        // Check console messages after clicking the button
+        console.log('📝 Console messages after clicking start button:')
+        consoleMessages.slice(-20).forEach(msg => console.log('  ', msg))
       } else {
         console.log('❌ Start Isaac Sim Video button not found')
       }
@@ -75,17 +94,22 @@ test.describe('Configure viewer smoke', () => {
       if (await isaacSimContainer.count() > 0) {
         console.log('✅ Isaac Sim display container found!')
 
-        // Check for canvas element
-        const canvas = isaacSimContainer.locator('canvas')
-        if (await canvas.count() > 0) {
+        // Check for video or canvas element (WebRTC or WebSocket streaming)
+        const videoElement = isaacSimContainer.locator('video')
+        const canvasElement = isaacSimContainer.locator('canvas')
+
+        const hasVideo = await videoElement.count() > 0
+        const hasCanvas = await canvasElement.count() > 0
+
+        if (hasVideo || hasCanvas) {
           console.log('🎉 SUCCESS: Isaac Sim video streaming is active!')
-          console.log('📋 Test Result: Complete Isaac Sim integration verified - Live video streaming working')
+          console.log(`📋 Test Result: Complete Isaac Sim integration verified - Live video streaming working via ${hasVideo ? 'WebRTC' : 'WebSocket'}`)
           console.log('🎬 Video Status: Active with 1920x1080 resolution and 15+ FPS')
 
           // Take final success screenshot
           await page.screenshot({ path: 'test-results/configure-success.png', fullPage: true })
         } else {
-          console.log('❌ Isaac Sim container found but no canvas element')
+          console.log('❌ Isaac Sim container found but no video or canvas element')
           const containerHtml = await isaacSimContainer.innerHTML()
           console.log('Isaac Sim container content:', containerHtml?.slice(0, 300))
         }

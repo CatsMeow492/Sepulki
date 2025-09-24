@@ -1,54 +1,45 @@
-# Isaac Sim Integration Dependencies
-# Note: These should be installed in Isaac Sim's Python environment
+# Anvil Sim - Isaac Sim Integration Service
+# Core dependencies for robotics simulation and video streaming
 
-# gRPC and Protocol Buffers
-grpcio==1.60.0
-grpcio-tools==1.60.0
-protobuf==4.25.1
+# WebSocket and networking
+websockets>=11.0.3
+asyncio-mqtt>=0.16.1
 
-# WebSocket server
-websockets==12.0
-tornado==6.4
+# Computer vision and image processing
+opencv-python>=4.8.0.0
+numpy>=1.24.0
+Pillow>=10.0.0
 
-# Async support
-# asyncio-glib==0.1  # Requires system deps, skipping for MVP
-aiofiles==23.2.1
+# gRPC and API
+grpcio>=1.58.0
+grpcio-tools>=1.58.0
+protobuf>=4.24.0
 
-# Data processing
-numpy==1.24.3
-scipy==1.11.4
+# WebRTC streaming
+aiortc>=1.6.0
+av>=10.0.0
 
-# Geometry and mathematics
-transforms3d==0.4.1
-# quaternion==2022.4.2  # Package unavailable, skipping for now
+# Database and caching
+asyncpg>=0.29.0
+redis>=5.0.0
+aioredis>=2.0.1
 
-# Configuration and utilities
-pydantic==2.5.2
-pyyaml==6.0.1
-python-dotenv==1.0.0
+# HTTP and web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+httpx>=0.25.0
 
-# Logging and monitoring
-structlog==23.2.0
-prometheus-client==0.19.0
+# Monitoring and metrics
+prometheus-client>=0.19.0
+psutil>=5.9.0
 
-# Redis client for caching
-redis==5.0.1
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+loguru>=0.7.2
 
-# Database connectivity
-asyncpg==0.29.0
-
-# HTTP client for API calls
-aiohttp==3.9.1
-
-# Image processing for video streams (commented out for MVP)
-# pillow==10.1.0  # Heavy dependency
-# opencv-python==4.8.1.78  # Very heavy dependency
-
-# Performance profiling
-py-spy==0.3.14
-
-# Development dependencies (optional)
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
-mypy==1.7.1
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+isort>=5.12.0
