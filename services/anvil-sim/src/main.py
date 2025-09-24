@@ -207,20 +207,31 @@ class AnvilSimService:
 
             # Update real Isaac Sim renderer with robot configuration
             if isaac_sim_robot and ISAAC_SIM_AVAILABLE:
-                await self.isaac_sim_renderer.load_robot(isaac_sim_robot)
-                logger.info("Real Isaac Sim robot loaded",
-                           robot_name=isaac_sim_robot.get('name'),
-                           isaac_sim_path=isaac_sim_robot.get('isaac_sim_path'))
+                try:
+                    await self.isaac_sim_renderer.load_robot(isaac_sim_robot)
+                    logger.info("Real Isaac Sim robot loaded",
+                               robot_name=isaac_sim_robot.get('name'),
+                               isaac_sim_path=isaac_sim_robot.get('isaac_sim_path'))
+                except Exception as e:
+                    logger.error("Failed to load robot in Isaac Sim", error=str(e))
 
             # Update video frame generator with robot configuration
             if isaac_sim_robot:
-                self.video_frame_generator.update_robot_config(isaac_sim_robot)
-                logger.info("Video frame generator updated with robot config",
-                           session_id=session_id,
-                           robot_name=isaac_sim_robot.get('name'))
+                try:
+                    self.video_frame_generator.update_robot_config(isaac_sim_robot)
+                    logger.info("Video frame generator updated with robot config",
+                               session_id=session_id,
+                               robot_name=isaac_sim_robot.get('name'))
+                except Exception as e:
+                    logger.error("Failed to update video frame generator", error=str(e))
 
                 # Also update WebRTC stream manager's video frame generator
-                webrtc_stream_manager.update_robot_config(isaac_sim_robot)
+                try:
+                    webrtc_stream_manager.update_robot_config(isaac_sim_robot)
+                    logger.info("WebRTC stream manager updated with robot config",
+                               robot_name=isaac_sim_robot.get('name'))
+                except Exception as e:
+                    logger.error("Failed to update WebRTC stream manager", error=str(e))
 
             logger.info("Isaac Sim session created", session_id=session_id,
                        user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE,
