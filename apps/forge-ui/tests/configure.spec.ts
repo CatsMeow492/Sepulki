@@ -51,11 +51,24 @@ test.describe('Configure viewer smoke', () => {
       await robotCards.first().click()
       console.log('🎯 Clicked first robot recommendation')
 
-      // Wait for Isaac Sim display to load
+      // Wait for connection to establish
       await page.waitForTimeout(3000)
 
       // Take screenshot after robot selection
       await page.screenshot({ path: 'test-results/configure-robot-selected.png', fullPage: true })
+
+      // Click the "Start Isaac Sim Video" button
+      const startButton = page.getByRole('button', { name: '🎬 Start Isaac Sim Video' })
+      if (await startButton.isVisible()) {
+        await startButton.click()
+        console.log('▶️ Clicked Start Isaac Sim Video button')
+
+        // Wait for video streaming to start
+        await page.waitForTimeout(3000)
+        console.log('⏳ Waited for video streaming to start')
+      } else {
+        console.log('❌ Start Isaac Sim Video button not found')
+      }
 
       // Check for Isaac Sim display container
       const isaacSimContainer = page.locator('[data-testid="isaac-sim-display"]')
