@@ -219,6 +219,9 @@ class AnvilSimService:
                            session_id=session_id,
                            robot_name=isaac_sim_robot.get('name'))
 
+                # Also update WebRTC stream manager's video frame generator
+                webrtc_stream_manager.update_robot_config(isaac_sim_robot)
+
             logger.info("Isaac Sim session created", session_id=session_id,
                        user_id=session['user_id'], isaac_sim_available=ISAAC_SIM_AVAILABLE,
                        robot_name=session.get('robot_name', 'Default Robot'))
@@ -293,11 +296,14 @@ class AnvilSimService:
             # Update video frame generator with new robot configuration
             try:
                 self.video_frame_generator.update_robot_config(isaac_sim_robot)
-                logger.info("Video frame generator updated with new robot", 
+                logger.info("Video frame generator updated with new robot",
                            session_id=session_id,
                            robot_name=isaac_sim_robot.get('name'))
+
+                # Also update WebRTC stream manager's video frame generator
+                webrtc_stream_manager.update_robot_config(isaac_sim_robot)
             except Exception as e:
-                logger.error("Failed to update video frame generator", 
+                logger.error("Failed to update video frame generator",
                             session_id=session_id, error=str(e))
             
             return web.json_response({

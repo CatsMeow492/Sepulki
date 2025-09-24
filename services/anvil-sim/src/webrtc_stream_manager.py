@@ -797,7 +797,14 @@ class WebRTCStreamManager:
             ))
         
         return metrics
-    
+
+    def update_robot_config(self, robot_config: Dict[str, Any]):
+        """Update the robot configuration for video generation."""
+        if hasattr(self, 'video_frame_generator') and self.video_frame_generator:
+            self.video_frame_generator.update_robot_config(robot_config)
+            logger.info("WebRTC video frame generator updated with robot config",
+                       robot_name=robot_config.get('name'))
+
     def get_session_info(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get streaming info for a specific session."""
         client_ids = self.session_streams.get(session_id, [])
