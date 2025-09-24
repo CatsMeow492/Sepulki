@@ -573,8 +573,8 @@ export function IsaacSimDisplay({
     )
   }
 
-  // TEMP: Always show connection UI for testing video functionality
-  const showConnectionUI = true
+  // Show connection UI when not connected or when video is not streaming
+  const showConnectionUI = connectionState !== 'connected' || !videoStreamWorking
 
   if (showConnectionUI) {
     return (
