@@ -42,6 +42,7 @@ export function IsaacSimDisplay({
   const [websocket, setWebsocket] = useState<WebSocket | null>(null)
   const [videoStreamWorking, setVideoStreamWorking] = useState(false)
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
+  const [webrtcClient, setWebrtcClient] = useState<any>(null)
   const [jointStates, setJointStates] = useState<Record<string, number>>({ 
     joint1: 0.2, 
     joint2: -0.3 
@@ -62,10 +63,17 @@ export function IsaacSimDisplay({
   })
 
     // Use port-forwarded Brev anvil-sim service endpoint
-    const anvilSimHost = 'localhost'
-    const anvilSimPort = '8002'
-    const httpBaseUrl = `http://${anvilSimHost}:${anvilSimPort}`
-    const wsUrl = `ws://${anvilSimHost}:8001`  // WebSocket on port 8001
+  const anvilSimHost = 'localhost'
+  const anvilSimPort = '8002'  // Bridge service port
+  const httpBaseUrl = `http://${anvilSimHost}:${anvilSimPort}`
+  const wsUrl = `ws://${anvilSimHost}:8002`  // Bridge service WebSocket
+  
+  // Isaac Sim WebRTC Browser Client URL (when available)
+  const isaacSimWebRTCUrl = `http://216.81.248.164:8211/streaming/webrtc-client?server=216.81.248.164`
+  
+  // Hybrid mode: Use iframe when WebRTC Browser Client is available, otherwise use custom controls
+  const [useIframeMode, setUseIframeMode] = useState(false)
+  const [webrtcClientAvailable, setWebrtcClientAvailable] = useState(false)
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -87,6 +95,19 @@ export function IsaacSimDisplay({
         const healthResponse = await fetch(`${httpBaseUrl}/health`)
         if (!healthResponse.ok) {
           throw new Error('Isaac Sim service not available')
+        }
+
+        // Check if WebRTC Browser Client is available
+        try {
+          const webrtcResponse = await fetch(`${httpBaseUrl}/check_webrtc_client`)
+          if (webrtcResponse.ok) {
+            const webrtcData = await webrtcResponse.json()
+            setWebrtcClientAvailable(webrtcData.available)
+            console.log('🔍 WebRTC Client status:', webrtcData)
+          }
+        } catch (error) {
+          console.log('🔍 WebRTC Client check failed:', error)
+          setWebrtcClientAvailable(false)
         }
 
         // Create session
@@ -182,7 +203,7 @@ export function IsaacSimDisplay({
         }
 
         // Establish WebSocket connection for controls and WebRTC signaling
-        const ws = new WebSocket(`${wsUrl.replace('8002', '8001')}`)
+        const ws = new WebSocket(`${wsUrl}`)
 
         ws.onopen = () => {
           console.log('🔌 WebSocket connected to Isaac Sim')
@@ -722,6 +743,18 @@ export function IsaacSimDisplay({
         style={{ display: videoStreamWorking ? 'none' : 'block', zIndex: 5 }} // Show when WebRTC fails
       />
 
+      {/* Isaac Sim WebRTC Browser Client iframe (hybrid mode) */}
+      {useIframeMode && connectionState === 'connected' && (
+        <iframe
+          src={isaacSimWebRTCUrl}
+          className="w-full h-full border-0 absolute inset-0"
+          style={{ zIndex: 3 }}
+          title="Isaac Sim WebRTC Stream"
+          allow="camera; microphone; autoplay; encrypted-media"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
+        />
+      )}
+
       {/* Start Video Button for User Interaction */}
       {!videoStreamWorking && connectionState === 'connected' && (
         <div className="absolute inset-0 flex items-center justify-center z-20">
@@ -785,6 +818,18 @@ export function IsaacSimDisplay({
               <span>WebSocket:</span>
               <span className={`font-semibold ${websocket?.readyState === WebSocket.OPEN ? 'text-green-400' : 'text-red-400'}`}>
                 {websocket?.readyState === WebSocket.OPEN ? '🔌 Connected' : '❌ Disconnected'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Mode:</span>
+              <span className={`font-semibold ${useIframeMode ? 'text-blue-400' : 'text-purple-400'}`}>
+                {useIframeMode ? '🖼️ Iframe' : '🎮 Custom'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>WebRTC Client:</span>
+              <span className={`font-semibold ${webrtcClientAvailable ? 'text-green-400' : 'text-gray-400'}`}>
+                {webrtcClientAvailable ? '✅ Available' : '❌ Not Available'}
               </span>
             </div>
           </div>
@@ -996,6 +1041,27 @@ export function IsaacSimDisplay({
               title="Toggle camera controls"
             >
               <Camera className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setUseIframeMode(!useIframeMode)}
+              disabled={!webrtcClientAvailable}
+              className={`p-3 rounded-lg text-white transition-all ${
+                useIframeMode 
+                  ? 'bg-blue-600 hover:bg-blue-700' 
+                  : webrtcClientAvailable
+                    ? 'bg-purple-600 hover:bg-purple-700'
+                    : 'bg-gray-600 cursor-not-allowed opacity-50'
+              }`}
+              title={
+                !webrtcClientAvailable 
+                  ? 'WebRTC Client not available' 
+                  : useIframeMode 
+                    ? 'Switch to custom controls' 
+                    : 'Switch to iframe mode'
+              }
+            >
+              {useIframeMode ? '🎮' : '🖼️'}
             </button>
 
             <button
