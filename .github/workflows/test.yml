@@ -42,7 +42,7 @@ jobs:
           fi
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: success()
         with:
           files: ./apps/forge-ui/coverage/lcov.info
@@ -91,7 +91,7 @@ jobs:
           fi
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: success()
         with:
           files: ./services/${{ matrix.service }}/coverage/lcov.info
