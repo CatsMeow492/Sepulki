@@ -19,7 +19,7 @@ ENV ISAAC_SIM_ROOT=/isaac-sim
 ENV PYTHONPATH="${PYTHONPATH}:${ISAAC_SIM_ROOT}/python_packages"
 
 # Stage 2: Development environment (for local development without Isaac Sim)
-FROM python:3.10-slim as development-base
+FROM python:3.14-slim as development-base
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
